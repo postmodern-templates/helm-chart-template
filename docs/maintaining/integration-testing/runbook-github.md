@@ -209,6 +209,40 @@ that release, it detects the release.*
     current content, left no conflict markers, and applied `.github/settings.yml`, and that
     `Test (Auto): PR Validation` triggers and passes on a new PR. Every check prints `[PASS]`.
 
+## Helm Chart Publishing
+
+A separate run: the repos above are Template projects, which don't publish a chart. It
+creates a Standard repo, plus a Basic container registry and a Microsoft Entra app
+registration with AcrPush on it, and the repo signs in as that app through a federated credential for the repo's `main` branch.
+
+- [ ] Sign in to the Azure CLI with `az login`, as an account that can create app
+  registrations and assign roles in the test resource group (such as its Owner).
+- [ ] Set the subscription and resource group for the test registry, once, in this repo's
+  `mise.local.toml`:
+
+    ```toml
+    [env]
+    INTEGRATION_TEST_AZURE_SUBSCRIPTION = "<subscription-id>"
+    INTEGRATION_TEST_AZURE_RESOURCE_GROUP = "<resource-group>"
+    ```
+
+- [ ] Start the run:
+
+    ```sh
+    cd <template-repo-path>
+    mise run integration-test-helm-gh
+    ```
+
+    Add `--owner <user-or-org>` if the main run used it.
+- [ ] When it finishes, its summary says "all checks passed": the release dispatched Helm
+  (Auto): Publish Release Chart, which pushed the chart, at the release's version, to the
+  registry.
+- [ ] Delete the repo, registry, and app registration, and confirm when it asks:
+
+    ```sh
+    mise run integration-test-helm-cleanup-gh
+    ```
+
 ## Cleaning Up
 
 - [ ] Delete the test repos, and confirm when it asks:

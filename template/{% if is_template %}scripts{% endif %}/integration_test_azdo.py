@@ -285,8 +285,11 @@ def create(
     *,
     code_coverage: bool,
     leaf: bool = False,
+    extra_answers: tuple[str, ...] = (),
 ) -> list[str]:
     """Run the template to create the test repo and register its pipelines.
+
+    `extra_answers` adds -d arguments, for a child template's own questions.
 
     `code_coverage` is explicit, so the two repos cover it on and off instead of both
     getting its default (off).
@@ -329,6 +332,7 @@ def create(
         "lifecycle=Pre-Alpha",
         "-d",
         f"code_coverage={'true' if code_coverage else 'false'}",
+        *extra_answers,
         source,
         dest,
     ).stdout

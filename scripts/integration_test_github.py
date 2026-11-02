@@ -178,8 +178,11 @@ def create(
     *,
     code_coverage: bool,
     leaf: bool = False,
+    extra_answers: tuple[str, ...] = (),
 ) -> None:
     """Run the template to create the test repo.
+
+    `extra_answers` adds -d arguments, for a child template's own questions.
 
     `github_username` is set to `login`, the account gh is logged in as, instead of
     auto-detected from local git config, and `github_org` to `owner` when that's another
@@ -225,6 +228,7 @@ def create(
         f"zensical_target={zensical_target}",
         "-d",
         f"code_coverage={'true' if code_coverage else 'false'}",
+        *extra_answers,
         source,
         dest,
     )

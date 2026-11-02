@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
-{%- if zensical_ghpages %}
+{%- if zensical_ghpages or is_standard %}
       actions: write
 {%- endif %}
     steps:
@@ -45,6 +45,17 @@ jobs:
         run: |
           version=$(mise x -- jq -r .version .config/knope-current-version.json)
           mise x -- gh workflow run docs-auto-zensical.yml -f tag="v$version"
+        env:
+          GH_TOKEN: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
+{%- endif %}
+{%- if is_standard %}
+      - name: Trigger Helm Release Chart
+        shell: bash
+        # Dispatched, since the tag knope creates with GITHUB_TOKEN fires no `push` event.
+        # The version comes from knope-current-version.json, merged with this PR.
+        run: |
+          version=$(mise x -- jq -r .version .config/knope-current-version.json)
+          mise x -- gh workflow run helm-auto-publishrelease.yml -f tag="v$version"
         env:
           GH_TOKEN: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
 {%- endif %}

@@ -53,6 +53,9 @@ run = [
   "az pipelines variable create --name GITHUB_COM_TOKEN --pipeline-name \"[{{ repo_name }}] Docs (Auto) - Zensical Build & Commit\" --secret true --allow-override true --org https://dev.azure.com/{{ azdo_org }}/ --project \"{{ azdo_project }}\"",
   "az pipelines variable create --name GITHUB_COM_TOKEN --pipeline-name \"[{{ repo_name }}] Release (Auto) - Prepare & Publish Release\" --secret true --allow-override true --org https://dev.azure.com/{{ azdo_org }}/ --project \"{{ azdo_project }}\"",
   "az pipelines variable create --name GITHUB_COM_TOKEN --pipeline-name \"[{{ repo_name }}] Test (Auto) - PR Validation\" --secret true --allow-override true --org https://dev.azure.com/{{ azdo_org }}/ --project \"{{ azdo_project }}\"",
+{%- if is_standard %}
+  "az pipelines variable create --name GITHUB_COM_TOKEN --pipeline-name \"[{{ repo_name }}] Helm (Auto) - Publish Release Chart\" --secret true --allow-override true --org https://dev.azure.com/{{ azdo_org }}/ --project \"{{ azdo_project }}\"",
+{%- endif %}
 {%- endif %}
 ]
 
@@ -188,6 +191,57 @@ flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_O
 flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"{% if project_default %} default="{{ project_default }}"{% endif %}
 '''
 run = "python scripts/integration_test_azdo.py --cleanup --repo-prefix {{ repo_name }}"
+
+[tasks.integration-test-helm-gh]
+# Verifies chart publishing on GitHub before a release. Creates a Standard test repo
+# from this template, and a container registry and app registration in the Azure
+# subscription and resource group you name, then releases a chart and checks that it
+# reached the registry. Sign in with `az login` first, and set
+# INTEGRATION_TEST_AZURE_SUBSCRIPTION and INTEGRATION_TEST_AZURE_RESOURCE_GROUP once in
+# mise.local.toml's [env], or pass --subscription and --resource-group. Everything
+# stays for inspection; delete it with `mise run integration-test-helm-cleanup-gh`.
+# The repo goes under this repo's owner; pass --owner for another user or organization.
+usage = '''
+flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
+flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--owner <owner>" help="User or organization for the test repo"{% if using_github %} default="{{ github_repo_owner }}"{% endif %}
+'''
+run = "python scripts/integration_test_helm.py --platform gh --source {% if using_github %}https://github.com/{{ github_repo_owner }}/{{ repo_name }}{% elif using_azdo %}git+https://dev.azure.com/{{ azdo_org }}/{{ azdo_project_encoded }}/_git/{{ repo_name }}{% endif %} --repo-prefix {{ repo_name }}"
+
+[tasks.integration-test-helm-cleanup-gh]
+# Deletes every repo, registry, and app registration integration-test-helm-gh created,
+# including those of a run that stopped partway, after listing them and asking. Pass the
+# same --owner as that run.
+usage = '''
+flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
+flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--owner <owner>" help="User or organization for the test repo"{% if using_github %} default="{{ github_repo_owner }}"{% endif %}
+'''
+run = "python scripts/integration_test_helm.py --platform gh --cleanup --repo-prefix {{ repo_name }}"
+
+[tasks.integration-test-helm-azdo]
+# Verifies chart publishing on Azure DevOps before a release, as integration-test-helm-gh
+# does on GitHub, signing in through a workload identity service connection. --org and
+# --project work as in integration-test-azdo. Delete what it creates with
+# `mise run integration-test-helm-cleanup-azdo`.
+usage = '''
+flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
+flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_ORG"{% if org_default %} default="{{ org_default }}"{% endif %}
+flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"{% if project_default %} default="{{ project_default }}"{% endif %}
+'''
+run = "python scripts/integration_test_helm.py --platform azdo --source {% if using_github %}https://github.com/{{ github_repo_owner }}/{{ repo_name }}{% elif using_azdo %}git+https://dev.azure.com/{{ azdo_org }}/{{ azdo_project_encoded }}/_git/{{ repo_name }}{% endif %} --repo-prefix {{ repo_name }}"
+
+[tasks.integration-test-helm-cleanup-azdo]
+# Deletes every repo, pipeline, service connection, registry, and app registration
+# integration-test-helm-azdo created, after listing them and asking.
+usage = '''
+flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
+flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_ORG"{% if org_default %} default="{{ org_default }}"{% endif %}
+flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"{% if project_default %} default="{{ project_default }}"{% endif %}
+'''
+run = "python scripts/integration_test_helm.py --platform azdo --cleanup --repo-prefix {{ repo_name }}"
 {%- endif %}
 
 [tools]
@@ -237,6 +291,12 @@ lychee = "0.24.2"
 {%- if is_template %}
 {#- renovate: datasource=github-releases depName=astral-sh/ruff #}
 ruff = "0.17.0"
+{%- endif %}
+{%- if is_standard %}
+{#- Packages and pushes the chart in the release workflow or pipeline, and lints it in
+   the helm-lint hook. #}
+{#- renovate: datasource=github-releases depName=helm/helm #}
+"aqua:helm/helm" = "4.3.1"
 {%- endif %}
 {#- renovate: datasource=github-releases depName=rvben/rumdl #}
 rumdl = "0.2.79"

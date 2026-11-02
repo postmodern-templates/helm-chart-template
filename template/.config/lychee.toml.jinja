@@ -3,6 +3,9 @@ exclude = [
   'git\+https://.*', # Can be removed once squidfunk/mike is replaced by Zensical's built-in versioning
   'https://github\.com/\$', # Shell/GH-Actions-expression placeholder in a URL (e.g. a $VAR or a templated repository expression), not a real URL
   '^http://127\.0\.0\.1:', # The chart's NOTES.txt prints a `kubectl port-forward` URL
+  # Identifiers, not pages: Azure Resource Manager's endpoint and GitHub's OIDC token issuer
+  '^https://management\.azure\.com/?$',
+  '^https://token\.actions\.githubusercontent\.com/?$',
 {%- if is_template %}
   'https://dev\.azure\.com', # This errors frequently, easier to just ignore
   'https://img\.shields\.io/github/all-contributors/', # Part of template code

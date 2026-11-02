@@ -18,21 +18,12 @@ COMMON = {
     "project_description": "Rendering test project",
 }
 
-# The Helm chart questions, asked only for a Standard project.
+# The Helm chart questions, asked only for a Standard project. acr_chart_prefix is
+# optional, so the entries cover it unset, one level deep, and nested.
 HELM = {
     "container_registry_type": "Azure Container Registry",
     "acr_name": "rendertest",
-    "acr_chart_prefix": "team",
     "helm_chart_name": "render-test-chart",
-}
-HELM_SERVICE_CONNECTION = {
-    **HELM,
-    "acr_login_method": "Admin Credentials via Service Connection",
-    "acr_service_connection": "render-test-connection",
-}
-HELM_PIPELINE_VARIABLE = {
-    **HELM,
-    "acr_login_method": "Admin Credentials via Pipeline Variable",
 }
 
 ANSWER_MATRIX = [
@@ -52,7 +43,8 @@ ANSWER_MATRIX = [
     {
         "id": "github-standard-private-none-docs-site-stable",
         **COMMON,
-        **HELM_SERVICE_CONNECTION,
+        **HELM,
+        "acr_chart_prefix": "team",
         "developer_platform": "GitHub",
         "github_username": "octocat",
         "project_type": "Standard",
@@ -83,7 +75,7 @@ ANSWER_MATRIX = [
     {
         "id": "github-standard-public-none-ghpages-inactive",
         **COMMON,
-        **HELM_PIPELINE_VARIABLE,
+        **HELM,
         "developer_platform": "GitHub",
         "github_username": "octocat",
         "project_type": "Standard",
@@ -110,7 +102,9 @@ ANSWER_MATRIX = [
     {
         "id": "azdo-standard-private-docs-site-alpha",
         **COMMON,
-        **HELM_SERVICE_CONNECTION,
+        **HELM,
+        "acr_chart_prefix": "team/apps",
+        "acr_service_connection": "render-test-connection",
         "developer_platform": "Azure DevOps",
         "azdo_org": "test-org",
         "azdo_project": "Test Project",
@@ -126,6 +120,59 @@ ANSWER_MATRIX = [
 # checks that they do. Each entry's `expected_error` is a substring of Copier's
 # "Invalid choice for '<question>': <validator message>".
 INVALID_ANSWER_MATRIX = [
+    {
+        "id": "acr-name-with-dash-rejected",
+        **COMMON,
+        "developer_platform": "GitHub",
+        "github_username": "octocat",
+        "project_visibility": "Private",
+        "license": "None",
+        "zensical_target": "docs-site Directory in Repo",
+        "lifecycle": "Pre-Alpha",
+        **HELM,
+        "acr_name": "render-test",
+        "expected_error": "Registry names are 5 to 50 letters and digits.",
+    },
+    {
+        "id": "helm-chart-name-uppercase-rejected",
+        **COMMON,
+        "developer_platform": "GitHub",
+        "github_username": "octocat",
+        "project_visibility": "Private",
+        "license": "None",
+        "zensical_target": "docs-site Directory in Repo",
+        "lifecycle": "Pre-Alpha",
+        **HELM,
+        "helm_chart_name": "RenderTest",
+        "expected_error": "Chart names are lowercase letters, digits, and '-'",
+    },
+    {
+        "id": "acr-chart-prefix-trailing-slash-rejected",
+        **COMMON,
+        "developer_platform": "GitHub",
+        "github_username": "octocat",
+        "project_visibility": "Private",
+        "license": "None",
+        "zensical_target": "docs-site Directory in Repo",
+        "lifecycle": "Pre-Alpha",
+        **HELM,
+        "acr_chart_prefix": "team/",
+        "expected_error": "Use lowercase letters and digits",
+    },
+    {
+        "id": "azdo-missing-service-connection-rejected",
+        **COMMON,
+        "developer_platform": "Azure DevOps",
+        "azdo_org": "test-org",
+        "azdo_project": "Test Project",
+        "project_visibility": "Private",
+        "license": "None",
+        "zensical_target": "docs-site Directory in Repo",
+        "lifecycle": "Pre-Alpha",
+        **HELM,
+        "acr_service_connection": "",
+        "expected_error": "Enter the service connection's name.",
+    },
     {
         "id": "azdo-public-visibility-rejected",
         **COMMON,

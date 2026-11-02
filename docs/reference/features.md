@@ -87,6 +87,20 @@ Documentation is set up with [Zensical](https://zensical.org/), the successor to
 - A manually triggered prerelease (alpha, beta, or rc) workflow/pipeline
 - On GitHub, third-party actions are pinned to commit SHAs, and Renovate keeps those pins current
 
+## Helm Chart Publishing
+
+- The chart lives in `src/<chart>/`, starting from `helm create`'s sample. Set `appVersion` in
+  its `Chart.yaml` to the version of the app it deploys; Knope sets `version` with each
+  release, in step with the project's own version.
+- prek runs `helm lint` on the chart whenever a commit changes it.
+- Each release packages the chart and pushes it to an Azure Container Registry, as
+  `oci://<registry>.azurecr.io/helm/<prefix>/<chart>:<version>`, where `<prefix>` is
+  `acr_chart_prefix` (left out when it's empty). Prereleases don't publish a chart.
+- Publishing signs in to Azure through federated identity, with no stored secret, and pushes
+  with a registry access token, so the registry's admin user can stay disabled.
+- Publishing needs a one-time setup per repo; see
+  [Helm Chart Publishing](../getting-started/prerequisites.md#helm-chart-publishing).
+
 ## Support Files
 
 - `.gitignore`, set to ignore macOS `.DS_Store` files, Windows `Thumbs.db` files, and tool caches (plus Python bytecode caches in Template projects)
