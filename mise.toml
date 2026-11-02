@@ -165,12 +165,16 @@ run = "python scripts/integration_test_azdo.py --cleanup --repo-prefix helm-char
 # subscription and resource group you name, then releases a chart and checks that it
 # reached the registry. Sign in with `az login` first, and set
 # INTEGRATION_TEST_AZURE_SUBSCRIPTION and INTEGRATION_TEST_AZURE_RESOURCE_GROUP once in
-# mise.local.toml's [env], or pass --subscription and --resource-group. Everything
-# stays for inspection; delete it with `mise run integration-test-helm-cleanup-gh`.
+# mise.local.toml's [env], or pass --subscription and --resource-group. Without the
+# rights to create those, use an existing registry and identity instead: see the
+# script's docstring for --registry and --client-id. Everything stays for inspection;
+# delete it with `mise run integration-test-helm-cleanup-gh`.
 # The repo goes under this repo's owner; pass --owner for another user or organization.
 usage = '''
 flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
-flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--resource-group <resource_group>" help="Resource group to create the test registry in" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--registry <registry>" help="Existing registry to publish to instead" env="INTEGRATION_TEST_AZURE_REGISTRY"
+flag "--client-id <client_id>" help="With --registry: app registration you own, with AcrPush on it" env="INTEGRATION_TEST_AZURE_CLIENT_ID"
 flag "--owner <owner>" help="User or organization for the test repo" default="postmodern-templates"
 '''
 run = "python scripts/integration_test_helm.py --platform gh --source https://github.com/postmodern-templates/helm-chart-template --repo-prefix helm-chart-template"
@@ -181,19 +185,24 @@ run = "python scripts/integration_test_helm.py --platform gh --source https://gi
 # same --owner as that run.
 usage = '''
 flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
-flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--resource-group <resource_group>" help="Resource group to create the test registry in" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--registry <registry>" help="Existing registry to publish to instead" env="INTEGRATION_TEST_AZURE_REGISTRY"
+flag "--client-id <client_id>" help="With --registry: app registration you own, with AcrPush on it" env="INTEGRATION_TEST_AZURE_CLIENT_ID"
 flag "--owner <owner>" help="User or organization for the test repo" default="postmodern-templates"
 '''
 run = "python scripts/integration_test_helm.py --platform gh --cleanup --repo-prefix helm-chart-template"
 
 [tasks.integration-test-helm-azdo]
 # Verifies chart publishing on Azure DevOps before a release, as integration-test-helm-gh
-# does on GitHub, signing in through a workload identity service connection. --org and
+# does on GitHub, signing in through a workload identity service connection, or through
+# an existing one with --registry and --service-connection. --org and
 # --project work as in integration-test-azdo. Delete what it creates with
 # `mise run integration-test-helm-cleanup-azdo`.
 usage = '''
 flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
-flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--resource-group <resource_group>" help="Resource group to create the test registry in" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--registry <registry>" help="Existing registry to publish to instead" env="INTEGRATION_TEST_AZURE_REGISTRY"
+flag "--service-connection <service_connection>" help="With --registry: service connection with AcrPush on it" env="INTEGRATION_TEST_AZDO_SERVICE_CONNECTION"
 flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_ORG"
 flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"
 '''
@@ -204,7 +213,9 @@ run = "python scripts/integration_test_helm.py --platform azdo --source https://
 # integration-test-helm-azdo created, after listing them and asking.
 usage = '''
 flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
-flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--resource-group <resource_group>" help="Resource group to create the test registry in" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--registry <registry>" help="Existing registry to publish to instead" env="INTEGRATION_TEST_AZURE_REGISTRY"
+flag "--service-connection <service_connection>" help="With --registry: service connection with AcrPush on it" env="INTEGRATION_TEST_AZDO_SERVICE_CONNECTION"
 flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_ORG"
 flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"
 '''

@@ -218,19 +218,44 @@ branch, whose answers record the commit just before the newest release.*
 ## Helm Chart Publishing
 
 A separate run: the repos above are Template projects, which don't publish a chart. It
-creates a Standard repo, plus a Basic container registry and a Microsoft Entra app
-registration with AcrPush on it, and the repo signs in as that app through a workload identity service connection.
+creates a Standard repo whose releases push a chart to an Azure Container Registry, signing
+in through a workload identity service connection. Set up Azure in whichever way your
+account allows:
 
-- [ ] Sign in to the Azure CLI with `az login`, as an account that can create app
-  registrations and assign roles in the test resource group (such as its Owner).
-- [ ] Set the subscription and resource group for the test registry, once, in this repo's
-  `mise.local.toml`:
+=== "Create a Temporary Registry"
 
-    ```toml
-    [env]
-    INTEGRATION_TEST_AZURE_SUBSCRIPTION = "<subscription-id>"
-    INTEGRATION_TEST_AZURE_RESOURCE_GROUP = "<resource-group>"
-    ```
+    The run creates a Basic registry, a Microsoft Entra app registration with AcrPush on it,
+    in a resource group you name, and a service connection that signs in as the app.
+
+    - [ ] Sign in to the Azure CLI with `az login`, as an account that can create app
+      registrations and assign roles in the resource group (such as its Owner).
+    - [ ] Set the subscription and resource group, once, in this repo's `mise.local.toml`:
+
+        ```toml
+        [env]
+        INTEGRATION_TEST_AZURE_SUBSCRIPTION = "<subscription-id>"
+        INTEGRATION_TEST_AZURE_RESOURCE_GROUP = "<resource-group>"
+        ```
+
+=== "Use an Existing Registry"
+
+    The run publishes to a registry that already exists, through a service connection in
+    the project with AcrPush on the registry, which any pipeline may use. Each run
+    publishes under its own `helm/integration-test/<repo>` path, which cleanup deletes.
+
+    - [ ] Sign in to the Azure CLI with `az login`, as an account that can pull from the
+      registry.
+    - [ ] Set the subscription, registry, and service connection, once, in this repo's
+      `mise.local.toml`:
+
+        ```toml
+        [env]
+        INTEGRATION_TEST_AZURE_SUBSCRIPTION = "<subscription-id>"
+        INTEGRATION_TEST_AZURE_REGISTRY = "<registry>"
+        INTEGRATION_TEST_AZDO_SERVICE_CONNECTION = "<service-connection>"
+        ```
+
+Then, either way:
 
 - [ ] Start the run:
 
@@ -241,9 +266,11 @@ registration with AcrPush on it, and the repo signs in as that app through a wor
 
     `--org` and `--project` work as for the main run.
 - [ ] When it finishes, its summary says "all checks passed": the release pipeline's run on
-  the release commit triggered Helm (Auto) - Publish Release Chart, which pushed the chart, at
-  the release's version, to the registry.
-- [ ] Delete the repo, registry, and app registration, pipelines, and service connection, and confirm when it asks:
+  the release commit triggered Helm (Auto) - Publish Release Chart, which pushed the chart,
+  at the release's version, to the registry.
+- [ ] Delete what the run made, and confirm when it asks: the repo and its pipelines, plus
+  the service connection, registry, and app registration it created, or the chart it added
+  to an existing registry.
 
     ```sh
     mise run integration-test-helm-cleanup-azdo
