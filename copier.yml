@@ -605,40 +605,54 @@ code_coverage:
 # endregion Questions
 
 # region Helm Chart Questions
+# A leaf template's copier.yml has no project_type question, and every project it creates
+# is Standard, so a missing project_type counts as Standard.
 container_registry_type:
   type: str
-  help: Choose what type of container registry this repo should deploy to.
+  help: The kind of container registry that releases publish the chart to.
   choices:
     - Azure Container Registry
-  when: "{{ project_type == 'Standard' }}"
-
-acr_login_method:
-  type: str
-  help: Choose login method for Azure Container Registry.
-  choices:
-    - Admin Credentials via Service Connection
-    - Admin Credentials via Pipeline Variable
-  when: "{{ container_registry_type == 'Azure Container Registry' }}"
+  default: Azure Container Registry
+  when: "{{ project_type | default('Standard') == 'Standard' }}"
 
 acr_name:
   type: str
-  help: The name of the Azure Container Registry
-  when: "{{ container_registry_type == 'Azure Container Registry' }}"
+  help: The Azure Container Registry's name, without .azurecr.io.
+  when: &when_acr "{{ project_type | default('Standard') == 'Standard' and container_registry_type == 'Azure Container Registry' }}"
+  validator: |-
+    {%- if not (acr_name | regex_search('^[A-Za-z0-9]{5,50}$')) -%}
+      Registry names are 5 to 50 letters and digits.
+    {%- endif -%}
 
 acr_service_connection:
   type: str
-  help: The name of the Azure DevOps Service Connection that has rights to the ACR.
-  when: "{{ acr_login_method == 'Admin Credentials via Service Connection' }}"
+  help: |-
+    The Azure Resource Manager service connection the release pipeline signs in to Azure with. Its identity needs the AcrPush role on the registry.
+  when: "{{ project_type | default('Standard') == 'Standard' and container_registry_type == 'Azure Container Registry' and developer_platform == 'Azure DevOps' }}"
+  validator: |-
+    {%- if not acr_service_connection -%}
+      Enter the service connection's name.
+    {%- endif -%}
 
 acr_chart_prefix:
   type: str
-  help: (OPTIONAL) If you share an ACR between multiple teams, put a team name here to have your charts logically separated.
-  when: "{{ container_registry_type == 'Azure Container Registry' }}"
+  help: |-
+    Optional: a path under helm/ in the registry for this chart, such as a team name, when several teams share a registry.
+  default: ""
+  when: *when_acr
+  validator: |-
+    {%- if acr_chart_prefix and not (acr_chart_prefix | regex_search('^[a-z0-9]+([._/-][a-z0-9]+)*$')) -%}
+      Use lowercase letters and digits, separated by '.', '_', '-', or '/'.
+    {%- endif -%}
 
 helm_chart_name:
   type: str
-  help: The name of the helm chart. (Make it something that will be globally unique.)
-  when: "{{ project_type == 'Standard' }}"
+  help: The chart's name, which is also its repository name in the registry.
+  when: "{{ project_type | default('Standard') == 'Standard' }}"
+  validator: |-
+    {%- if not (helm_chart_name | regex_search('^[a-z0-9]([a-z0-9-]*[a-z0-9])?$')) -%}
+      Chart names are lowercase letters, digits, and '-', starting and ending with a letter or digit.
+    {%- endif -%}
 # endregion Helm Chart Questions
 
 # region Post-Question Computed Values
@@ -816,6 +830,13 @@ setup_checklist:
     - [ ] If the Renovate GitHub App only has access to selected repositories, add this one.
     - [ ] When Renovate opens its **Dependency Dashboard** issue, pin it (**Pin issue** in the sidebar) to keep it at the top of the Issues tab.
     - [ ] On the first release PR, approve its PR Validation run (**Approve and run workflow**); GitHub holds runs on bot-opened PRs until someone approves them.
+    {%- endif %}
+    {%- if project_type | default('Standard') == 'Standard' and container_registry_type == 'Azure Container Registry' %}
+    {%- if using_github %}
+    - [ ] Let the release workflow push charts to {{ acr_name }}: create a Microsoft Entra app registration with a federated credential for this repo's main branch, give it the AcrPush role on the registry, and set the AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_SUBSCRIPTION_ID repository variables. See {{ docs_url }}getting-started/prerequisites{{ docs_page_suffix }}#helm-chart-publishing.
+    {%- elif using_azdo %}
+    - [ ] Give the {{ acr_service_connection }} service connection's identity the AcrPush role on {{ acr_name }}, and permit the Helm (Auto) - Publish Release Chart pipeline to use the connection on its first run. See {{ docs_url }}getting-started/prerequisites{{ docs_page_suffix }}#helm-chart-publishing.
+    {%- endif %}
     {%- endif %}
     - [ ] Merge the first release PR once PR Validation passes.
     {%- if is_public and license == 'None' %}
@@ -1134,6 +1155,23 @@ _tasks:
       --org https://dev.azure.com/{{ azdo_org }}/
       --project "{{ azdo_project }}"
     when: *when_copy_set_repo_settings_azdo
+
+  # Creates Azure Pipeline for helm-auto-publishrelease, which the release pipeline's
+  # completion triggers
+  - command: >-
+      az pipelines create
+      --name "[{{ repo_name }}] Helm (Auto) - Publish Release Chart"
+      --repository {{ repo_name }}
+      --repository-type tfsgit
+      --branch main
+      --yml-path .azurepipelines/helm-auto-publishrelease.yml
+      --skip-first-run true
+      --org https://dev.azure.com/{{ azdo_org }}/
+      --project "{{ azdo_project }}"
+    when: |-
+      {%- if _copier_operation == 'copy' and should_set_repo_settings and using_azdo and project_type | default('Standard') == 'Standard' and container_registry_type == 'Azure Container Registry' -%}
+        true
+      {%- endif %}
 
   # Applies .github/settings.yml with gh-settings, which mise.toml pins: the repo
   # settings, labels, branch protection ruleset, Actions settings, and, with GitHub

@@ -1,5 +1,13 @@
 [package]
+{%- if is_standard %}
+# The chart's version follows each release, so the published chart carries it.
+versioned_files = [
+  { path = ".config/knope-current-version.json", regex = "\"version\": \"(?<version>[^\"]+)\"" },
+  { path = "src/{{ helm_chart_name }}/Chart.yaml", regex = '(?m)^version: (?<version>\S+)$' },
+]
+{%- else %}
 versioned_files = [{ path = ".config/knope-current-version.json", regex = "\"version\": \"(?<version>[^\"]+)\"" }]
+{%- endif %}
 changelog = "CHANGELOG.md"
 # Renovate writes a Dependency-Update footer for each bump (see renovate.json), so
 # chore(deps) commits, which Knope otherwise ignores, release as patches.

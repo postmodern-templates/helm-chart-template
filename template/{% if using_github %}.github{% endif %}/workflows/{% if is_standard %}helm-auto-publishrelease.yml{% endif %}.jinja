@@ -1,0 +1,57 @@
+name: "Helm (Auto): Publish Release Chart"
+
+# Release (Auto): Publish Release dispatches this. A tag created with the default
+# GITHUB_TOKEN fires no `push` event, since GitHub doesn't trigger workflows from
+# GITHUB_TOKEN actions; workflow_dispatch is the documented exception.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (vX.Y.Z)
+        required: true
+        type: string
+
+env:
+  MISE_ENV: ci
+  REGISTRY: {{ acr_name }}.azurecr.io
+  REPOSITORY: helm{% if acr_chart_prefix %}/{{ acr_chart_prefix }}{% endif %}
+  CHART: src/{{ helm_chart_name }}
+
+jobs:
+  publish-chart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Signs in to Azure through the federated credential, with no stored secret
+      id-token: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: {% raw %}${{ inputs.tag }}{% endraw %}
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5
+        with:
+          version: 2026.10.10 # jdx/mise
+      - name: Sign In to Azure
+        # The app registration these variables name needs a federated credential for
+        # this repo's main branch, where the dispatch runs, and AcrPush on the registry.
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3
+        with:
+          client-id: {% raw %}${{ vars.AZURE_CLIENT_ID }}{% endraw %}
+          tenant-id: {% raw %}${{ vars.AZURE_TENANT_ID }}{% endraw %}
+          subscription-id: {% raw %}${{ vars.AZURE_SUBSCRIPTION_ID }}{% endraw %}
+      - name: Sign In to the Registry
+        shell: bash
+        # A registry access token works with the registry's admin user disabled. Helm
+        # takes it with this fixed username.
+        run: |
+          az acr login --name {{ acr_name }} --expose-token --output tsv --query accessToken \
+            | mise x -- helm registry login "$REGISTRY" --username 00000000-0000-0000-0000-000000000000 --password-stdin
+      - name: Package and Push Chart
+        shell: bash
+        run: |
+          mise x -- helm package "$CHART" --dependency-update --version "${TAG#v}" --destination .cache/chart
+          mise x -- helm push .cache/chart/*.tgz "oci://$REGISTRY/$REPOSITORY"
+        env:
+          TAG: {% raw %}${{ inputs.tag }}{% endraw %}

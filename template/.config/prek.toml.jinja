@@ -114,6 +114,17 @@ entry = "mise x -- ryl check --fix"
 types = ["yaml"]
 exclude = "copier-answers.yml"
 require_serial = true
+{%- if is_standard %}
+
+[[repos.hooks]]
+id = "helm-lint"
+name = "helm lint"
+description = "Lints the Helm chart"
+language = "system"
+entry = "mise x -- helm lint src/{{ helm_chart_name }}"
+files = "^src/{{ helm_chart_name }}/"
+pass_filenames = false
+{%- endif %}
 
 [[repos.hooks]]
 id = "shellcheck"

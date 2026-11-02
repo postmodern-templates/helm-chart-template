@@ -147,3 +147,32 @@ Pipelines' built-in coverage publishing on Azure DevOps. It publishes a Cobertur
 from the repo root but doesn't generate one. Your test command, or a language-specific child
 template, produces it: for example `pytest-cov`'s `--cov-report=xml` for Python, or Pester's
 `-CodeCoverage` for PowerShell.
+
+## Helm Chart Questions
+
+These questions are asked only for a Standard project, which is a chart.
+
+## `container_registry_type`: Azure Container Registry
+
+Where each release publishes the chart. Azure Container Registry is the only choice.
+
+## `acr_name`
+
+The registry's name, without `.azurecr.io`: 5 to 50 letters and digits.
+
+## `acr_service_connection`
+
+Azure DevOps only: the Azure Resource Manager service connection the publish pipeline signs in
+with. Its identity needs the AcrPush role on the registry. GitHub projects sign in through
+repository variables instead; see
+[Helm Chart Publishing](../getting-started/prerequisites.md#helm-chart-publishing).
+
+## `acr_chart_prefix`
+
+Optional: a path under `helm/` in the registry, such as a team's name, for a registry that
+several teams share. Leave it empty to publish to `helm/<chart>`.
+
+## `helm_chart_name`
+
+The chart's name, in `Chart.yaml` and as its repository name in the registry: lowercase
+letters, digits, and `-`.

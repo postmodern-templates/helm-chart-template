@@ -66,3 +66,6 @@ Each platform's runbook holds every step of a run, from setup to cleanup:
 
 - [Integration Test Runbook (GitHub)](runbook-github.md)
 - [Integration Test Runbook (Azure DevOps)](runbook-azdo.md)
+
+Each runbook ends with a separate run for Helm chart publishing, which needs an Azure
+subscription to create a test registry in.

@@ -1,0 +1,61 @@
+name: $(BuildId)
+
+# Runs each time the release pipeline finishes on main, at the commit that run built.
+# A stable release tag on that commit means the run published a release; any other run
+# ends here without publishing.
+trigger: none
+pr: none
+
+resources:
+  pipelines:
+    - pipeline: release
+      source: "[{{ repo_name }}] Release (Auto) - Prepare & Publish Release"
+      trigger:
+        branches:
+          include:
+            - main
+
+variables:
+  CI: true
+  MISE_ENV: ci
+  REGISTRY: {{ acr_name }}.azurecr.io
+  REPOSITORY: helm{% if acr_chart_prefix %}/{{ acr_chart_prefix }}{% endif %}
+  CHART: src/{{ helm_chart_name }}
+
+pool:
+  vmImage: ubuntu-latest
+
+jobs:
+  - job: publish
+    displayName: Publish Release Chart
+    timeoutInMinutes: 15
+    steps:
+      - checkout: self
+        fetchDepth: 0
+        fetchTags: true
+      - bash: |
+          # Prereleases are skipped: knope tags them without committing the bumped
+          # Chart.yaml.
+          tag=$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+          if [ -z "$tag" ]; then
+            echo "No release tag on this commit, so there's no chart to publish."
+          fi
+          echo "##vso[task.setvariable variable=RELEASE_TAG]$tag"
+        displayName: Find Release Tag
+      - template: templates/setup-mise.yml
+      - task: AzureCLI@2
+        displayName: Package and Push Chart
+        condition: and(succeeded(), ne(variables['RELEASE_TAG'], ''))
+        inputs:
+          # Its identity needs AcrPush on the registry. A registry access token works
+          # with the registry's admin user disabled; Helm takes it with this fixed
+          # username.
+          azureSubscription: {{ acr_service_connection }}
+          scriptType: bash
+          scriptLocation: inlineScript
+          inlineScript: |
+            set -euo pipefail
+            az acr login --name {{ acr_name }} --expose-token --output tsv --query accessToken \
+              | mise x -- helm registry login "$(REGISTRY)" --username 00000000-0000-0000-0000-000000000000 --password-stdin
+            mise x -- helm package "$(CHART)" --dependency-update --version "${RELEASE_TAG#v}" --destination .cache/chart
+            mise x -- helm push .cache/chart/*.tgz "oci://$(REGISTRY)/$(REPOSITORY)"

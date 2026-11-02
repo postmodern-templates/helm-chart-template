@@ -159,6 +159,57 @@ flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZD
 '''
 run = "python scripts/integration_test_azdo.py --cleanup --repo-prefix helm-chart-template"
 
+[tasks.integration-test-helm-gh]
+# Verifies chart publishing on GitHub before a release. Creates a Standard test repo
+# from this template, and a container registry and app registration in the Azure
+# subscription and resource group you name, then releases a chart and checks that it
+# reached the registry. Sign in with `az login` first, and set
+# INTEGRATION_TEST_AZURE_SUBSCRIPTION and INTEGRATION_TEST_AZURE_RESOURCE_GROUP once in
+# mise.local.toml's [env], or pass --subscription and --resource-group. Everything
+# stays for inspection; delete it with `mise run integration-test-helm-cleanup-gh`.
+# The repo goes under this repo's owner; pass --owner for another user or organization.
+usage = '''
+flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
+flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--owner <owner>" help="User or organization for the test repo" default="postmodern-templates"
+'''
+run = "python scripts/integration_test_helm.py --platform gh --source https://github.com/postmodern-templates/helm-chart-template --repo-prefix helm-chart-template"
+
+[tasks.integration-test-helm-cleanup-gh]
+# Deletes every repo, registry, and app registration integration-test-helm-gh created,
+# including those of a run that stopped partway, after listing them and asking. Pass the
+# same --owner as that run.
+usage = '''
+flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
+flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--owner <owner>" help="User or organization for the test repo" default="postmodern-templates"
+'''
+run = "python scripts/integration_test_helm.py --platform gh --cleanup --repo-prefix helm-chart-template"
+
+[tasks.integration-test-helm-azdo]
+# Verifies chart publishing on Azure DevOps before a release, as integration-test-helm-gh
+# does on GitHub, signing in through a workload identity service connection. --org and
+# --project work as in integration-test-azdo. Delete what it creates with
+# `mise run integration-test-helm-cleanup-azdo`.
+usage = '''
+flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
+flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_ORG"
+flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"
+'''
+run = "python scripts/integration_test_helm.py --platform azdo --source https://github.com/postmodern-templates/helm-chart-template --repo-prefix helm-chart-template"
+
+[tasks.integration-test-helm-cleanup-azdo]
+# Deletes every repo, pipeline, service connection, registry, and app registration
+# integration-test-helm-azdo created, after listing them and asking.
+usage = '''
+flag "--subscription <subscription>" help="Azure subscription for the test registry" env="INTEGRATION_TEST_AZURE_SUBSCRIPTION"
+flag "--resource-group <resource_group>" help="Resource group for the test registry" env="INTEGRATION_TEST_AZURE_RESOURCE_GROUP"
+flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_ORG"
+flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"
+'''
+run = "python scripts/integration_test_helm.py --platform azdo --cleanup --repo-prefix helm-chart-template"
+
 [tools]
 # Backends
 python = "3.15.0" # Used by copier

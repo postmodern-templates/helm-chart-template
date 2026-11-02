@@ -49,6 +49,38 @@
     - `Contribute to pull requests`
     - `Create branch`
 
+## Helm Chart Publishing
+
+A chart project's releases push the chart to its Azure Container Registry. Set this up once per
+repo, before its first release.
+
+=== "GitHub"
+
+    The release workflow signs in as a Microsoft Entra app registration, through a federated
+    credential for the repo's `main` branch, and needs the AcrPush role on the registry. With
+    the Azure CLI signed in to the registry's subscription, and the GitHub CLI in the repo,
+    replace `<owner>`, `<repo>`, and `<registry>`:
+
+    ```sh
+    client_id=$(az ad app create --display-name <repo> --query appId -o tsv)
+    az ad sp create --id "$client_id"
+    az ad app federated-credential create --id "$client_id" --parameters '{"name": "github-main", "issuer": "https://token.actions.githubusercontent.com", "subject": "repo:<owner>/<repo>:ref:refs/heads/main", "audiences": ["api://AzureADTokenExchange"]}'
+    az role assignment create --assignee "$client_id" --role AcrPush --scope "$(az acr show --name <registry> --query id -o tsv)"
+    gh variable set AZURE_CLIENT_ID --body "$client_id"
+    gh variable set AZURE_TENANT_ID --body "$(az account show --query tenantId -o tsv)"
+    gh variable set AZURE_SUBSCRIPTION_ID --body "$(az account show --query id -o tsv)"
+    ```
+
+=== "Azure DevOps"
+
+    The publish pipeline signs in through the Azure Resource Manager service connection that
+    `acr_service_connection` names. Workload identity federation is the kind that needs no
+    stored secret.
+
+    1. Give the service connection's identity the AcrPush role on the registry.
+    1. Allow the Helm (Auto) - Publish Release Chart pipeline to use the connection, under the
+       connection's **Security** settings, or permit it when its first run asks.
+
 ## Workstation Prerequisites
 
 ### Universal
