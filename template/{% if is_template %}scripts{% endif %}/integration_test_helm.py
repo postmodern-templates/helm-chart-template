@@ -835,19 +835,21 @@ def cleanup(args: argparse.Namespace) -> None:
     """
     pattern = test_repo_pattern(args.repo_prefix, args.platform)
     check_azure(args.subscription, args.resource_group)
-    if args.platform == "gh":
-        deletions = find_github_repos(args, pattern)
-        clones = local_clones(pattern, "github.com")
-    else:
-        deletions = find_azdo_resources(args, pattern)
-        clones = local_clones(pattern, "dev.azure.com")
-    deletions += find_shared_resources(args, pattern)
+    # Azure first: Azure DevOps won't delete a service connection while its app
+    # registration still has federated credentials, which deleting the app removes.
+    deletions = find_shared_resources(args, pattern)
     if args.resource_group:
         deletions += find_azure_resources(
             name_prefix(args.repo_prefix, args.platform),
             args.subscription,
             args.resource_group,
         )
+    if args.platform == "gh":
+        deletions += find_github_repos(args, pattern)
+        clones = local_clones(pattern, "github.com")
+    else:
+        deletions += find_azdo_resources(args, pattern)
+        clones = local_clones(pattern, "dev.azure.com")
     if not deletions and not clones:
         say("No Helm integration-test repos, Azure resources, or clones to delete.")
         return
