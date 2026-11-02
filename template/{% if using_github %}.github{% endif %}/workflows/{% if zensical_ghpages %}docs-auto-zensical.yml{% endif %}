@@ -1,0 +1,108 @@
+name: "Docs (Auto): Zensical Publish to GitHub Pages"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - zensical.toml
+      - .github/workflows/docs-auto-zensical.yml
+      - docs/**
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to deploy as the 'latest' docs alias (leave blank to just build)"
+        required: false
+        type: string
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  MISE_ENV: ci
+
+jobs:
+  build-zensical:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Configure Git Credentials
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5
+        with:
+          version: 2026.10.10 # jdx/mise
+          # uv builds mike, a git dependency, against a Python interpreter in the
+          # runner's temporary _temp dir, which this cache doesn't include. A cached
+          # mike from another run points at an interpreter that's gone ("cannot
+          # execute: required file not found"). Only this workflow runs mike, so the
+          # cache is off here alone.
+          cache: false
+      - shell: bash
+        run: echo "cache_id=$(date --utc '+%V')" >> "$GITHUB_ENV"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          key: zensical-${{ env.cache_id }}
+          path: ~/.cache
+          restore-keys: |
+            zensical-
+      - name: Check for gh-pages Index
+        id: index-check
+        # Inlined instead of jiangxin/file-exists-action, which is unmaintained.
+        # fetch-depth: 0 above fetches every branch, so origin/gh-pages resolves locally.
+        shell: bash
+        run: |
+          if git cat-file -e origin/gh-pages:index.html 2>/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - shell: bash
+        run: mike set-default --push --allow-undefined dev
+        if: ${{ steps.index-check.outputs.exists == 'false' }}
+      - shell: bash
+        run: mike deploy --push --update-aliases dev
+        if: ${{ github.event_name == 'push' }}
+      - shell: bash
+        # Through env rather than ${{ }} in the script, since inputs.tag is free text.
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          mike deploy --push --update-aliases "$TAG" latest
+          mike set-default --push latest
+        if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '') }}
+  deploy-zensical:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: build-zensical
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: gh-pages
+      - name: Setup Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+        with:
+          path: '.'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

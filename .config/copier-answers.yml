@@ -1,17 +1,22 @@
-# Changes here will be overwritten by Copier
-_commit: v0.3.0
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v0.8.3
 _src_path: gh:postmodern-templates/repo-template
+agent_instructions: true
 author_name: Nate Scherer
+code_coverage: false
+copyright_year: '2024'
 developer_platform: GitHub
-github_org: ''
+extensible_template: false
+github_org: postmodern-templates
 github_username: natescherer
 license: MIT
 lifecycle: Pre-Alpha
-project_name: Postmodern Helm Chart Copier Template
-project_short_description: A Copier template for writing and publishing Helm charts
-    with full CI/CD.
+project_description: A Copier template for writing and publishing Helm charts with
+    full CI/CD.
+project_initialized: true
+project_name: Postmodern Helm Chart Template
 project_type: Template
 project_visibility: Public
-project_website: ''
-repo_actions: None
-repo_name: postmodern-helm-chart-copiertemplate
+repo_name: helm-chart-template
+repo_setup_actions: None
+zensical_target: GitHub Pages

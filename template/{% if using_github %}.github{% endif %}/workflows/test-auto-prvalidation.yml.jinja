@@ -1,0 +1,71 @@
+name: "Test (Auto): PR Validation"
+
+on:
+  pull_request:
+    # Explicit; the implicit default (opened, synchronize, reopened) omits `edited`,
+    # so a title-only edit wouldn't otherwise re-run the PR-title check below.
+    types: [opened, edited, synchronize, reopened]
+
+concurrency:
+  group: {% raw %}${{ github.workflow }}-${{ github.head_ref || github.run_id }}{% endraw %}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5
+        with:
+          version: 2026.10.10 # jdx/mise
+      - name: Check PR Title is a Conventional Commit
+        shell: bash
+        env:
+          PR_TITLE: {% raw %}${{ github.event.pull_request.title }}{% endraw %}
+        run: echo "$PR_TITLE" | mise x -- committed --config .config/committed.toml --commit-file -
+      - name: Run Prek Tests
+        shell: bash
+        env:
+          BASE_REF: {% raw %}${{ github.base_ref }}{% endraw %}
+          GITHUB_TOKEN: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
+        run: |
+          git fetch origin "$BASE_REF"
+          CHANGED_FILES=$(git diff --name-only "origin/$BASE_REF...HEAD")
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No changed files detected; skipping prek."
+          else
+            echo "$CHANGED_FILES"
+            mapfile -t FILES <<< "$CHANGED_FILES"
+            mise x -- prek run -c .config/prek.toml --files "${FILES[@]}"
+          fi
+      # Applying the file needs admin access, which GITHUB_TOKEN can't have, so this
+      # reminds whoever merges the PR to apply it.
+      - name: Remind to Apply Repo Settings
+        shell: bash
+        env:
+          BASE_REF: {% raw %}${{ github.base_ref }}{% endraw %}
+        run: |
+          if ! git diff --quiet "origin/$BASE_REF...HEAD" -- .github/settings.yml; then
+            echo "::warning file=.github/settings.yml::After merging, run 'mise run sync-repo-settings' to apply this file to GitHub."
+          fi
+{%- if is_template %}
+      - name: Run Template Render Tests
+        shell: bash
+        run: |-
+          mise x -- pytest tests/
+{%- endif %}
+{%- if code_coverage %}
+      - name: Upload Coverage to Codecov
+        if: {% raw %}${{ hashFiles('coverage.xml') != '' }}{% endraw %}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          token: {% raw %}${{ secrets.CODECOV_TOKEN }}{% endraw %}
+          files: coverage.xml
+          fail_ci_if_error: false
+{%- endif %}

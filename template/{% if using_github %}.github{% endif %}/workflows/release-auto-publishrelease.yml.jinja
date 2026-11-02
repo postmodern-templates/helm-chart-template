@@ -1,0 +1,50 @@
+name: "Release (Auto): Publish Release"
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+env:
+  MISE_ENV: ci
+
+jobs:
+  release-on-knope-pr-merge:
+    if: github.head_ref == 'knope/release' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+{%- if zensical_ghpages %}
+      actions: write
+{%- endif %}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5
+        with:
+          version: 2026.10.10 # jdx/mise
+      - name: Publish Release
+        shell: bash
+        run: mise x -- knope release-on-knope-pr-merge --verbose
+        env:
+          GITHUB_TOKEN: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
+{%- if zensical_ghpages %}
+      - name: Trigger Docs Latest-Alias Deploy
+        shell: bash
+        # A release created with the default GITHUB_TOKEN fires no `release: published`
+        # event for docs-auto-zensical.yml to react to: GitHub doesn't trigger workflows
+        # from GITHUB_TOKEN actions, to prevent recursion. workflow_dispatch is the
+        # documented exception, so this dispatches it directly; see
+        # https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow.
+        # The version comes from knope-current-version.json, merged with this PR, not
+        # `git describe`: knope creates the tag through the API, so this checkout
+        # doesn't have it.
+        run: |
+          version=$(mise x -- jq -r .version .config/knope-current-version.json)
+          mise x -- gh workflow run docs-auto-zensical.yml -f tag="v$version"
+        env:
+          GH_TOKEN: {% raw %}${{ secrets.GITHUB_TOKEN }}{% endraw %}
+{%- endif %}

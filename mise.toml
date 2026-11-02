@@ -1,0 +1,194 @@
+min_version = "2026.8.13"
+
+[hooks]
+postinstall = [
+  "{% set is_in_ci = get_env(name='CI', default='') %}{% if is_in_ci %}echo 'Not setting up git hooks as mise is running in CI!'{% else %}prek install -f -c .config/prek.toml{% endif %}",
+]
+
+[env]
+# Keep tool caches under .cache/ instead of the repo root.
+PYTHONPYCACHEPREFIX = ".cache/pycache"
+RUMDL_CACHE_DIR = ".cache/rumdl"
+PYTEST_ADDOPTS = "-o cache_dir=.cache/pytest -n auto"
+RUFF_CACHE_DIR = ".cache/ruff"
+
+[tasks.copier-update]
+# Runs the newest Copier, not the one pinned below: only the template version being
+# updated to knows the Copier it needs (_min_copier_version), so the pin from this
+# project's current version can fall short of it. jinja2-shell-extension, which the
+# template's copier.yml loads, is unpinned for the same reason: a newer template can
+# need a newer extension. `@latest` and --refresh make uvx resolve both afresh instead
+# of reusing a cached environment.
+run = "uvx --refresh --from copier@latest --with jinja2-shell-extension copier update --answers-file .config/copier-answers.yml --skip-answered --trust"
+
+[tasks.set-lifecycle]
+# Asks only the `lifecycle` question again (--ask overrides --skip-answered for it,
+# with the current value preselected), and --vcs-ref=:current: keeps the installed
+# template version, so no template update comes with it. _min_copier_version covers
+# both flags.
+run = "copier update --answers-file .config/copier-answers.yml --skip-answered --trust --vcs-ref=:current: --ask lifecycle"
+
+[tasks.docs-server]
+run = "zensical serve"
+
+[tasks.provision-secrets]
+# Opt-in, and separate from _tasks on purpose; see
+# https://postmodern-templates.github.io/helm-chart-template/latest/reference/token-permissions/. `raw` hands
+# the terminal to gh and az, so each CLI's own masked prompt reads the value directly;
+# it never appears in a command-line argument, mise's logs, or a script.
+raw = true
+run = [
+  "gh secret set APPRISE_URL",
+]
+
+[tasks.renovate-lookup]
+# Runs every Renovate manager over the working tree without pushing or opening
+# anything; the debug log's "packageFiles with updates" entry lists what each one
+# detected. Its tools are task-scoped, so they only install when this task runs.
+env = { LOG_LEVEL = "debug", RENOVATE_PLATFORM = "local", RENOVATE_DRY_RUN = "lookup" }
+run = "renovate"
+
+[tasks.renovate-lookup.tools]
+node = "24.22.0"
+
+[tasks.renovate-lookup.tools."npm:renovate"]
+version = "44.158.1"
+# @yarnpkg/libzip@3.2.2 (a renovate transitive dependency) lost the provenance
+# attestation 3.2.0 had, so mise's trust policy refuses it; remove once
+# https://github.com/yarnpkg/berry/issues/7182 is fixed.
+trust_policy_excludes = ["@yarnpkg/libzip@3.2.2"]
+
+[tasks.sync-repo-settings]
+# Applies .github/settings.yml to the repo with gh-settings, showing the changes and
+# asking before it makes them; `mise x -- gh-settings plan` only shows them. Needs
+# admin access to the repo through `gh auth login`. `raw` hands the terminal to
+# gh-settings for its prompt.
+raw = true
+run = "gh-settings sync"
+
+[tasks.test]
+run = "pytest tests/"
+
+[tasks.template-docs-server]
+# Previews template/'s docs with a real Zensical build under every distinct
+# ANSWER_MATRIX entry: no single answer set renders the whole docs/ tree, since both
+# content and file paths depend on the answers. See the script's docstring. It runs
+# through `uv run` so its PEP 723 header can supply rich, tomlkit, and watchdog.
+run = "uv run scripts/template_docs_server.py"
+
+[tasks.integration-test-gh]
+# Verifies a release candidate on main before a release. Creates two test repos from
+# this template and runs every automated check against Repo A, a copy at HEAD. Repo B
+# is a copy at the last stable tag: update it to HEAD yourself, as the runbook's
+# Repo B section says, then check it with
+# `mise run integration-test-verify-update-gh`. Both repos stay
+# for inspection; delete them with `mise run integration-test-cleanup-gh`. See
+# https://postmodern-templates.github.io/helm-chart-template/latest/maintaining/integration-testing/index.html and
+# https://postmodern-templates.github.io/helm-chart-template/latest/maintaining/integration-testing/runbook-github/.
+# The repos go under this repo's owner; pass --owner for another user or organization.
+usage = '''
+flag "--owner <owner>" help="User or organization for the test repos" default="postmodern-templates"
+'''
+run = "python scripts/integration_test_github.py --source https://github.com/postmodern-templates/helm-chart-template --repo-prefix helm-chart-template --leaf"
+
+[tasks.integration-test-verify-update-gh]
+# Run after updating Repo B by hand (see the "Repo B" section of
+# https://postmodern-templates.github.io/helm-chart-template/latest/maintaining/integration-testing/runbook-github/).
+# Checks that the update brought in current content, left no conflict markers, and that
+# PR Validation still works. It verifies the newest run's Repo B, found from its local
+# clone, unless --repo and --local-path name another.
+usage = '''
+flag "--repo <repo>" help="owner/repo of the already-updated Repo B"
+flag "--local-path <path>" help="Local clone path printed when Repo B was created"
+'''
+run = "python scripts/integration_test_github.py --verify-update --repo-prefix helm-chart-template"
+
+[tasks.integration-test-cleanup-gh]
+# Deletes every repo integration-test-gh created, including those of a run that
+# stopped partway, after listing them and asking. Pass the same --owner as that run.
+usage = '''
+flag "--owner <owner>" help="User or organization for the test repos" default="postmodern-templates"
+'''
+run = "python scripts/integration_test_github.py --cleanup --repo-prefix helm-chart-template"
+
+[tasks.integration-test-azdo]
+# Verifies a release candidate on main before a release. Creates two test repos from
+# this template and runs every automated check against Repo A, a copy at HEAD. Repo B
+# is a copy at the last stable tag: update it to HEAD yourself, as the runbook's
+# Repo B section says, then check it with
+# `mise run integration-test-verify-update-azdo`. Both repos stay for inspection;
+# delete them with `mise run integration-test-cleanup-azdo`. See
+# https://postmodern-templates.github.io/helm-chart-template/latest/maintaining/integration-testing/index.html and
+# https://postmodern-templates.github.io/helm-chart-template/latest/maintaining/integration-testing/runbook-azdo/.
+#
+# --org and --project default to INTEGRATION_TEST_AZDO_ORG and
+# INTEGRATION_TEST_AZDO_PROJECT, which you can set once in mise.local.toml's
+# [env].
+# Or pass them, as in `mise run integration-test-azdo --org myorg --project myproject`.
+# The `usage` field, not the deprecated option() function, passes them to the script
+# as environment variables (usage_org, usage_project), which works the same in any
+# shell and fails clearly when a required value is missing.
+usage = '''
+flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_ORG"
+flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"
+'''
+run = "python scripts/integration_test_azdo.py --source https://github.com/postmodern-templates/helm-chart-template --repo-prefix helm-chart-template --leaf"
+
+[tasks.integration-test-verify-update-azdo]
+# Run after updating Repo B by hand (see the "Repo B" section of
+# https://postmodern-templates.github.io/helm-chart-template/latest/maintaining/integration-testing/runbook-azdo/).
+# Checks that the update brought in current content, left no conflict markers, renamed
+# pipelines in place, and that PR Validation still works. It verifies the newest run's
+# Repo B, found from its local clone, which also names its org and project, unless
+# --repo and --local-path name another.
+usage = '''
+flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_ORG"
+flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"
+flag "--repo <repo>" help="Name of the already-updated Repo B"
+flag "--local-path <path>" help="Local clone path printed when Repo B was created"
+'''
+run = "python scripts/integration_test_azdo.py --verify-update --repo-prefix helm-chart-template"
+
+[tasks.integration-test-cleanup-azdo]
+# Deletes every repo integration-test-azdo created, and their pipelines, including
+# those of a run that stopped partway, after listing them and asking. --org and
+# --project work as in integration-test-azdo.
+usage = '''
+flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_ORG"
+flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"
+'''
+run = "python scripts/integration_test_azdo.py --cleanup --repo-prefix helm-chart-template"
+
+[tools]
+# Backends
+python = "3.15.0" # Used by copier
+uv = "0.13.1" # Used by pipx tools
+# Tools
+actionlint = "1.7.12"
+"aqua:cli/cli" = "2.102.0"
+"github:noirbizarre/gh-settings" = "0.3.0"
+"github:knope-dev/knope" = "knope/v0.23.0"
+"aqua:crate-ci/typos" = "1.51.1"
+"aqua:j178/prek" = "0.5.5"
+"aqua:owenlamont/ryl" = "0.25.1"
+"aqua:tombi-toml/tombi" = "1.8.4"
+committed = "1.1.11"
+lychee = "0.24.2"
+ruff = "0.17.0"
+rumdl = "0.2.79"
+shellcheck = "0.11.0"
+
+[tools."pipx:copier"]
+version = "9.19.1"
+uvx_args = "--with jinja2-shell-extension==2.1.1"
+
+[tools."pipx:pytest"]
+version = "9.1.1"
+# pytest-github-actions-annotate-failures and pytest-azurepipelines report failures and
+# warnings as platform annotations (::error:: on GitHub, ##vso[task.logissue] on Azure
+# DevOps), detecting the CI from the environment it sets.
+uvx_args = "--with pyyaml==6.0.3 --with jinja2==3.1.6 --with jinja2-ansible-filters==1.3.2 --with pytest-xdist==3.8.0 --with pytest-github-actions-annotate-failures==0.4.2"
+
+[tools."pipx:zensical"]
+version = "0.0.71"
+uvx_args = "--with git+https://github.com/squidfunk/mike.git@2.2.0+zensical-0.1.0"

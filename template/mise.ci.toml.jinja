@@ -1,0 +1,27 @@
+[tools]
+{#- renovate: datasource=pypi depName=apprise versioning=pep440 #}
+"pipx:apprise" = "2.0.1"
+{%- if using_github %}
+{#- Used by the release workflows to read .config/knope-*.json. GitHub-hosted runners
+   ship jq, but self-hosted ones aren't guaranteed to. #}
+{#- renovate: datasource=github-releases depName=jqlang/jq extractVersion=^jq-(?<version>\d+\.\d+\.\d+)$ #}
+jq = "1.8.2"
+{%- endif %}
+{%- if using_azdo %}
+{#- renovate: datasource=node-version depName=node versioning=node #}
+node = "24.22.0"
+{#- renovate: datasource=npm depName=renovate #}
+
+[tools."npm:renovate"]
+version = "44.158.1"
+# @yarnpkg/libzip@3.2.2 (a renovate transitive dependency) lost the provenance
+# attestation 3.2.0 had, so mise's trust policy refuses it; remove once
+# https://github.com/yarnpkg/berry/issues/7182 is fixed.
+trust_policy_excludes = ["@yarnpkg/libzip@3.2.2"]
+{%- endif %}
+{%- if using_github and zensical_ghpages %}
+
+[tools."pipx:git+https://github.com/squidfunk/mike.git"]
+version = "2.2.0+zensical-0.1.0"
+uvx_args = "--with zensical==0.0.71"
+{%- endif %}
