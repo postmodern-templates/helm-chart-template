@@ -649,7 +649,18 @@ def find_azure_resources(
         *(
             (
                 f"registry {r['name']}",
-                ("az", "acr", "delete", "--ids", r["id"], "--yes"),
+                (
+                    "az",
+                    "acr",
+                    "delete",
+                    "--name",
+                    r["name"],
+                    "--resource-group",
+                    resource_group,
+                    "--subscription",
+                    subscription,
+                    "--yes",
+                ),  # fmt: skip
             )
             for r in registries or []
             if r["repo"] and pattern.fullmatch(r["repo"])
@@ -819,7 +830,7 @@ def cleanup(args: argparse.Namespace) -> None:
     then asks.
 
     Raises:
-        SystemExit: if a local clone can't be deleted.
+        SystemExit: if anything couldn't be deleted.
 
     """
     pattern = test_repo_pattern(args.repo_prefix, args.platform)
@@ -848,11 +859,20 @@ def cleanup(args: argparse.Namespace) -> None:
     if not github.confirm("Delete all of these?", yes=args.yes):
         say("Nothing deleted.")
         return
-    for _, command in deletions:
-        run(*command)
+    # One failed deletion doesn't stop the rest; a rerun finds whatever's left.
+    failed = [
+        label
+        for label, command in deletions
+        if run(*command, check=False).returncode != 0
+    ]
     deleted = remove_clones(clones)
-    say(f"Deleted {len(deletions)} resource(s) and {deleted} local clone(s).")
-    if deleted < len(clones):
+    say(
+        f"Deleted {len(deletions) - len(failed)} of {len(deletions)} resource(s) and "
+        f"{deleted} of {len(clones)} local clone(s)."
+    )
+    for label in failed:
+        say(f"  Couldn't delete {label}; see the error above.")
+    if failed or deleted < len(clones):
         raise SystemExit(1)
 
 
