@@ -1110,6 +1110,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#helm-chart-publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Helm Chart Publishing
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#support-files" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1472,6 +1483,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#helm-chart-publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Helm Chart Publishing
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#support-files" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1672,6 +1694,20 @@
   <a href="https://knope.tech/">Knope</a>: each push to <code>main</code> updates a release PR, and merging it publishes the release; see <a href="../../maintaining/releasing/">Releasing</a></li>
 <li>A manually triggered prerelease (alpha, beta, or rc) workflow/pipeline</li>
 <li>On GitHub, third-party actions are pinned to commit SHAs, and Renovate keeps those pins current</li>
+</ul>
+<h2 id="helm-chart-publishing">Helm Chart Publishing<a class="headerlink" href="#helm-chart-publishing" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The chart lives in <code>src/&lt;chart&gt;/</code>, starting from <code>helm create</code>'s sample. Set <code>appVersion</code> in
+  its <code>Chart.yaml</code> to the version of the app it deploys; Knope sets <code>version</code> with each
+  release, in step with the project's own version.</li>
+<li>prek runs <code>helm lint</code> on the chart whenever a commit changes it.</li>
+<li>Each release packages the chart and pushes it to an Azure Container Registry, as
+  <code>oci://&lt;registry&gt;.azurecr.io/helm/&lt;prefix&gt;/&lt;chart&gt;:&lt;version&gt;</code>, where <code>&lt;prefix&gt;</code> is
+  <code>acr_chart_prefix</code> (left out when it's empty). Prereleases don't publish a chart.</li>
+<li>Publishing signs in to Azure through federated identity, with no stored secret, and pushes
+  with a registry access token, so the registry's admin user can stay disabled.</li>
+<li>Publishing needs a one-time setup per repo; see
+  <a href="../../getting-started/prerequisites/#helm-chart-publishing">Helm Chart Publishing</a>.</li>
 </ul>
 <h2 id="support-files">Support Files<a class="headerlink" href="#support-files" title="Permanent link">&para;</a></h2>
 <ul>

@@ -478,6 +478,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#helm-chart-publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Helm Chart Publishing
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#workstation-prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1314,6 +1325,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#helm-chart-publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Helm Chart Publishing
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#workstation-prerequisites" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1484,6 +1506,37 @@ off, as <code>Project Collection Build Service (&lt;Org&gt;)</code>.</p>
 </div>
 </div>
 </div>
+<h2 id="helm-chart-publishing">Helm Chart Publishing<a class="headerlink" href="#helm-chart-publishing" title="Permanent link">&para;</a></h2>
+<p>A chart project's releases push the chart to its Azure Container Registry. Set this up once per
+repo, before its first release.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">GitHub</label><label for="__tabbed_2_2">Azure DevOps</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>The release workflow signs in as a Microsoft Entra app registration, through a federated
+credential for the repo's <code>main</code> branch, and needs the AcrPush role on the registry. With
+the Azure CLI signed in to the registry's subscription, and the GitHub CLI in the repo,
+replace <code>&lt;owner&gt;</code>, <code>&lt;repo&gt;</code>, and <code>&lt;registry&gt;</code>:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">client_id</span><span class="o">=</span><span class="k">$(</span>az<span class="w"> </span>ad<span class="w"> </span>app<span class="w"> </span>create<span class="w"> </span>--display-name<span class="w"> </span>&lt;repo&gt;<span class="w"> </span>--query<span class="w"> </span>appId<span class="w"> </span>-o<span class="w"> </span>tsv<span class="k">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>az<span class="w"> </span>ad<span class="w"> </span>sp<span class="w"> </span>create<span class="w"> </span>--id<span class="w"> </span><span class="s2">"</span><span class="nv">$client_id</span><span class="s2">"</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>az<span class="w"> </span>ad<span class="w"> </span>app<span class="w"> </span>federated-credential<span class="w"> </span>create<span class="w"> </span>--id<span class="w"> </span><span class="s2">"</span><span class="nv">$client_id</span><span class="s2">"</span><span class="w"> </span>--parameters<span class="w"> </span><span class="s1">'{"name": "github-main", "issuer": "https://token.actions.githubusercontent.com", "subject": "repo:&lt;owner&gt;/&lt;repo&gt;:ref:refs/heads/main", "audiences": ["api://AzureADTokenExchange"]}'</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>az<span class="w"> </span>role<span class="w"> </span>assignment<span class="w"> </span>create<span class="w"> </span>--assignee<span class="w"> </span><span class="s2">"</span><span class="nv">$client_id</span><span class="s2">"</span><span class="w"> </span>--role<span class="w"> </span>AcrPush<span class="w"> </span>--scope<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>az<span class="w"> </span>acr<span class="w"> </span>show<span class="w"> </span>--name<span class="w"> </span>&lt;registry&gt;<span class="w"> </span>--query<span class="w"> </span>id<span class="w"> </span>-o<span class="w"> </span>tsv<span class="k">)</span><span class="s2">"</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>gh<span class="w"> </span>variable<span class="w"> </span><span class="nb">set</span><span class="w"> </span>AZURE_CLIENT_ID<span class="w"> </span>--body<span class="w"> </span><span class="s2">"</span><span class="nv">$client_id</span><span class="s2">"</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>gh<span class="w"> </span>variable<span class="w"> </span><span class="nb">set</span><span class="w"> </span>AZURE_TENANT_ID<span class="w"> </span>--body<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>az<span class="w"> </span>account<span class="w"> </span>show<span class="w"> </span>--query<span class="w"> </span>tenantId<span class="w"> </span>-o<span class="w"> </span>tsv<span class="k">)</span><span class="s2">"</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>gh<span class="w"> </span>variable<span class="w"> </span><span class="nb">set</span><span class="w"> </span>AZURE_SUBSCRIPTION_ID<span class="w"> </span>--body<span class="w"> </span><span class="s2">"</span><span class="k">$(</span>az<span class="w"> </span>account<span class="w"> </span>show<span class="w"> </span>--query<span class="w"> </span>id<span class="w"> </span>-o<span class="w"> </span>tsv<span class="k">)</span><span class="s2">"</span>
+</span></code></pre></div>
+</div>
+<div class="tabbed-block">
+<p>The publish pipeline signs in through the Azure Resource Manager service connection that
+<code>acr_service_connection</code> names. Workload identity federation is the kind that needs no
+stored secret.</p>
+<ol>
+<li>Give the service connection's identity the AcrPush role on the registry.</li>
+<li>Allow the Helm (Auto) - Publish Release Chart pipeline to use the connection, under the
+   connection's <strong>Security</strong> settings, or permit it when its first run asks.</li>
+</ol>
+</div>
+</div>
+</div>
 <h2 id="workstation-prerequisites">Workstation Prerequisites<a class="headerlink" href="#workstation-prerequisites" title="Permanent link">&para;</a></h2>
 <h3 id="universal">Universal<a class="headerlink" href="#universal" title="Permanent link">&para;</a></h3>
 <ol>
@@ -1492,7 +1545,7 @@ off, as <code>Project Collection Build Service (&lt;Org&gt;)</code>.</p>
 <li><a href="https://mise.jdx.dev/getting-started.html#activate-mise">Activate mise in your shell</a>.</li>
 </ol>
 <h3 id="platform-specific">Platform-Specific<a class="headerlink" href="#platform-specific" title="Permanent link">&para;</a></h3>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">GitHub</label><label for="__tabbed_2_2">Azure DevOps</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">GitHub</label><label for="__tabbed_3_2">Azure DevOps</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <ol>
@@ -1501,7 +1554,7 @@ off, as <code>Project Collection Build Service (&lt;Org&gt;)</code>.</p>
    <a href="https://github.com/noirbizarre/gh-settings">gh-settings</a>, which mise installs. Your
    login needs admin access to the repo.</li>
 <li>Log in to the GitHub CLI:
-    <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gh auth login
+    <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>gh auth login
 </span></code></pre></div></li>
 <li>Set up Git authentication over HTTPS, with either:<ul>
 <li><code>gh auth setup-git</code>, so Git reuses the GitHub CLI's credentials.</li>
@@ -1516,15 +1569,15 @@ off, as <code>Project Collection Build Service (&lt;Org&gt;)</code>.</p>
 <ol>
 <li>Install the <a href="https://learn.microsoft.com/cli/azure/install-azure-cli">Azure CLI</a>.</li>
 <li>Install its Azure DevOps extension and log in:
-    <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>az extension add --name azure-devops
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>az login --allow-no-subscriptions --use-device-code
+    <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>az extension add --name azure-devops
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>az login --allow-no-subscriptions --use-device-code
 </span></code></pre></div></li>
 <li>Install <a href="https://github.com/git-ecosystem/git-credential-manager">Git Credential Manager</a> to
    authenticate Git over HTTPS. Git for Windows includes it; on macOS and Linux, install it
    separately.</li>
 <li>Sign Git in to your organization, replacing both <code>&lt;org&gt;</code>s, and enter the code it prints at
    the page it names. Git Credential Manager keeps its own sign-in, separate from <code>az login</code>:
-    <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>echo url=https://&lt;org&gt;@dev.azure.com/&lt;org&gt;/ | git -c credential.msauthFlow=devicecode credential fill | git credential approve
+    <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>echo url=https://&lt;org&gt;@dev.azure.com/&lt;org&gt;/ | git -c credential.msauthFlow=devicecode credential fill | git credential approve
 </span></code></pre></div></li>
 </ol>
 </div>

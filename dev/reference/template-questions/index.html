@@ -1054,6 +1054,72 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#helm-chart-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Helm Chart Questions
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#container_registry_type-azure-container-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>container_registry_type</code>: Azure Container Registry
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acr_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>acr_name</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acr_service_connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>acr_service_connection</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acr_chart_prefix" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>acr_chart_prefix</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#helm_chart_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>helm_chart_name</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1382,6 +1448,72 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#helm-chart-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Helm Chart Questions
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#container_registry_type-azure-container-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>container_registry_type</code>: Azure Container Registry
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acr_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>acr_name</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acr_service_connection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>acr_service_connection</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acr_chart_prefix" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>acr_chart_prefix</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#helm_chart_name" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>helm_chart_name</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1594,6 +1726,23 @@ Pipelines' built-in coverage publishing on Azure DevOps. It publishes a Cobertur
 from the repo root but doesn't generate one. Your test command, or a language-specific child
 template, produces it: for example <code>pytest-cov</code>'s <code>--cov-report=xml</code> for Python, or Pester's
 <code>-CodeCoverage</code> for PowerShell.</p>
+<h2 id="helm-chart-questions">Helm Chart Questions<a class="headerlink" href="#helm-chart-questions" title="Permanent link">&para;</a></h2>
+<p>These questions are asked only for a Standard project, which is a chart.</p>
+<h2 id="container_registry_type-azure-container-registry"><code>container_registry_type</code>: Azure Container Registry<a class="headerlink" href="#container_registry_type-azure-container-registry" title="Permanent link">&para;</a></h2>
+<p>Where each release publishes the chart. Azure Container Registry is the only choice.</p>
+<h2 id="acr_name"><code>acr_name</code><a class="headerlink" href="#acr_name" title="Permanent link">&para;</a></h2>
+<p>The registry's name, without <code>.azurecr.io</code>: 5 to 50 letters and digits.</p>
+<h2 id="acr_service_connection"><code>acr_service_connection</code><a class="headerlink" href="#acr_service_connection" title="Permanent link">&para;</a></h2>
+<p>Azure DevOps only: the Azure Resource Manager service connection the publish pipeline signs in
+with. Its identity needs the AcrPush role on the registry. GitHub projects sign in through
+repository variables instead; see
+<a href="../../getting-started/prerequisites/#helm-chart-publishing">Helm Chart Publishing</a>.</p>
+<h2 id="acr_chart_prefix"><code>acr_chart_prefix</code><a class="headerlink" href="#acr_chart_prefix" title="Permanent link">&para;</a></h2>
+<p>Optional: a path under <code>helm/</code> in the registry, such as a team's name, for a registry that
+several teams share. Leave it empty to publish to <code>helm/&lt;chart&gt;</code>.</p>
+<h2 id="helm_chart_name"><code>helm_chart_name</code><a class="headerlink" href="#helm_chart_name" title="Permanent link">&para;</a></h2>
+<p>The chart's name, in <code>Chart.yaml</code> and as its repository name in the registry: lowercase
+letters, digits, and <code>-</code>.</p>
 
 
 
