@@ -57,14 +57,17 @@ repo, before its first release.
 === "GitHub"
 
     The release workflow signs in as a Microsoft Entra app registration, through a federated
-    credential for the repo's `main` branch, and needs the AcrPush role on the registry. With
+    credential for the repo's `main` branch, and needs the AcrPush role on the registry. The
+    credential's subject has to match the one in the workflow's token, which can include
+    the owner's and repo's numeric IDs; the repo's OIDC settings give its exact start. With
     the Azure CLI signed in to the registry's subscription, and the GitHub CLI in the repo,
-    replace `<owner>`, `<repo>`, and `<registry>`:
+    replace `<owner>`, `<repo>`, and `<registry>`, in Bash (Git Bash on Windows):
 
     ```sh
     client_id=$(az ad app create --display-name <repo> --query appId -o tsv)
     az ad sp create --id "$client_id"
-    az ad app federated-credential create --id "$client_id" --parameters '{"name": "github-main", "issuer": "https://token.actions.githubusercontent.com", "subject": "repo:<owner>/<repo>:ref:refs/heads/main", "audiences": ["api://AzureADTokenExchange"]}'
+    subject="$(gh api repos/<owner>/<repo>/actions/oidc/customization/sub --jq .sub_claim_prefix):ref:refs/heads/main"
+    az ad app federated-credential create --id "$client_id" --parameters "{\"name\": \"github-main\", \"issuer\": \"https://token.actions.githubusercontent.com\", \"subject\": \"$subject\", \"audiences\": [\"api://AzureADTokenExchange\"]}"
     az role assignment create --assignee "$client_id" --role AcrPush --scope "$(az acr show --name <registry> --query id -o tsv)"
     gh variable set AZURE_CLIENT_ID --body "$client_id"
     gh variable set AZURE_TENANT_ID --body "$(az account show --query tenantId -o tsv)"
