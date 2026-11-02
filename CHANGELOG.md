@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/postmodern-templates/helm-chart-template/compare/v0.2.0...v0.2.1) (2026-11-02)
+
+
+### Bug Fixes
+
+* Pull gh actions bot from all-contributors ([b15cf48](https://github.com/postmodern-templates/helm-chart-template/commit/b15cf489c6191d1d6f2594ed657de28055817286))
+* Pull gh actions bot from all-contributors ([0c0aa99](https://github.com/postmodern-templates/helm-chart-template/commit/0c0aa99aa0ec861abb459548a672f8a1be59f769))
+
 ## [0.2.0](https://github.com/natescherer/postmodern-helm-chart-copiertemplate/compare/v0.0.1...v0.2.0) (2024-10-23)
 
 
