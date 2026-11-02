@@ -13,6 +13,13 @@ flow and checks that the release pushed the chart to the registry. The repo and 
 Azure resources stay for inspection; delete them with
 `mise run integration-test-helm-cleanup-gh` or
 `mise run integration-test-helm-cleanup-azdo`.
+
+Without the rights to create those in Azure, pass --registry to use an existing
+registry, and an identity that already has AcrPush on it. On GitHub, that's
+--client-id, an app registration you own; each run adds a federated credential for its
+repo, which cleanup removes. On Azure DevOps, it's --service-connection, an existing
+one any pipeline may use. Each run publishes under its own path in the registry, which
+cleanup deletes.
 """
 
 import argparse
@@ -30,7 +37,9 @@ from console import RepoResult, check, heading, run, say, start_log, step, summa
 from repo_edits import local_clone_dir, local_clones, prepare_repo_b, remove_clones
 
 CHART = "integration-test-chart"
-CHART_PREFIX = "integration-test"
+# Under the registry's helm/ path; each run publishes beneath it, in a folder
+# named after its repo, so a shared registry keeps runs apart.
+CHART_ROOT = "integration-test"
 RELEASE_WORKFLOW = "helm-auto-publishrelease.yml"
 HELM_PIPELINE = "Helm (Auto) - Publish Release Chart"
 GITHUB_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
@@ -93,8 +102,8 @@ def json_file(directory: str, name: str, content: object) -> str:
     return str(path)
 
 
-def check_azure(subscription: str, resource_group: str) -> str:
-    """Verify az is signed in and can see the resource group, before creating anything.
+def check_azure(subscription: str, resource_group: str | None) -> str:
+    """Verify az is signed in, and can see the resource group if there is one.
 
     Returns:
         The subscription's tenant ID.
@@ -113,6 +122,8 @@ def check_azure(subscription: str, resource_group: str) -> str:
             f"az can't see subscription {subscription!r}. Sign in with `az login`, "
             "then rerun."
         )
+    if not resource_group:
+        return account.stdout.strip()
     group = run(
         "az", "group", "show", "--name", resource_group, "--subscription", subscription,
         check=False, capture=True,
@@ -122,6 +133,37 @@ def check_azure(subscription: str, resource_group: str) -> str:
             f"az can't see resource group {resource_group!r} in {subscription!r}."
         )
     return account.stdout.strip()
+
+
+def check_registry(acr: str, subscription: str) -> None:
+    """Verify az can read an existing registry's repositories, before creating anything.
+
+    The run reads the published chart's tags at the end, which needs pull access.
+
+    Raises:
+        SystemExit: if az can't list the registry's repositories.
+
+    """
+    result = run(
+        "az", "acr", "repository", "list", "--name", acr,
+        "--subscription", subscription, "--top", "1",
+        check=False, capture=True,
+    )  # fmt: skip
+    if result.returncode:
+        raise SystemExit(
+            f"az can't read registry {acr!r}'s repositories; the run needs pull access "
+            f"to check what it published.\n{result.stderr.strip()}"
+        )
+
+
+def chart_prefix(repo_name: str) -> str:
+    """Return the run's acr_chart_prefix answer, which names its own registry path.
+
+    Returns:
+        `integration-test/<repo_name>`.
+
+    """
+    return f"{CHART_ROOT}/{repo_name}"
 
 
 def registry_name(repo_name: str) -> str:
@@ -207,10 +249,10 @@ def add_federated_credential(
 
 
 def check_chart_published(
-    acr: str, subscription: str, version: str, failures: list[str]
+    acr: str, subscription: str, repo_name: str, version: str, failures: list[str]
 ) -> None:
-    """Check that the registry has the chart at `version`."""
-    repository = f"helm/{CHART_PREFIX}/{CHART}"
+    """Check that the registry has the run's chart at `version`."""
+    repository = f"helm/{chart_prefix(repo_name)}/{CHART}"
     tags = run(
         "az", "acr", "repository", "show-tags", "--name", acr,
         "--subscription", subscription, "--repository", repository, "-o", "tsv",
@@ -224,7 +266,9 @@ def check_chart_published(
     )
 
 
-def helm_answers(acr: str, service_connection: str = "") -> tuple[str, ...]:
+def helm_answers(
+    acr: str, repo_name: str, service_connection: str = ""
+) -> tuple[str, ...]:
     """Return the -d arguments for this template's Helm questions.
 
     Returns:
@@ -234,7 +278,7 @@ def helm_answers(acr: str, service_connection: str = "") -> tuple[str, ...]:
     answers = [
         "-d", "container_registry_type=Azure Container Registry",
         "-d", f"acr_name={acr}",
-        "-d", f"acr_chart_prefix={CHART_PREFIX}",
+        "-d", f"acr_chart_prefix={chart_prefix(repo_name)}",
         "-d", f"helm_chart_name={CHART}",
     ]  # fmt: skip
     if service_connection:
@@ -252,6 +296,8 @@ def run_github(args: argparse.Namespace, scratch: str) -> RepoResult:
     github.check_gh_installed()
     github.check_scopes()
     tenant = check_azure(args.subscription, args.resource_group)
+    if args.registry:
+        check_registry(args.registry, args.subscription)
     login = github.gh_value("api", "user", "--jq", ".login")
     owner = args.owner or login
     repo_name = f"{name_prefix(args.repo_prefix, 'gh')}{int(time.time())}"
@@ -259,15 +305,20 @@ def run_github(args: argparse.Namespace, scratch: str) -> RepoResult:
     dest = local_clone_dir(repo_name)
     failures: list[str] = []
 
-    heading("A Standard GitHub copy at HEAD, publishing to a new registry")
-    acr, client_id, _ = create_azure_resources(
-        repo_name, args.subscription, args.resource_group
-    )
+    if args.registry:
+        heading(f"A Standard GitHub copy at HEAD, publishing to {args.registry}")
+        acr, client_id = args.registry, args.client_id
+    else:
+        heading("A Standard GitHub copy at HEAD, publishing to a new registry")
+        acr, client_id, _ = create_azure_resources(
+            repo_name, args.subscription, args.resource_group
+        )
     step("Adding a federated credential for the repo's main branch")
     # The release workflow dispatches the publish workflow on main, so its token's
-    # subject names that branch.
+    # subject names that branch. Named after the repo, so cleanup finds it on a
+    # shared app.
     add_federated_credential(
-        client_id, "github-main", GITHUB_OIDC_ISSUER,
+        client_id, repo_name, GITHUB_OIDC_ISSUER,
         f"repo:{repo}:ref:refs/heads/main", scratch,
     )  # fmt: skip
     step(f"Creating {repo} at HEAD")
@@ -282,7 +333,7 @@ def run_github(args: argparse.Namespace, scratch: str) -> RepoResult:
         "GitHub Pages",
         code_coverage=False,
         leaf=True,
-        extra_answers=helm_answers(acr),
+        extra_answers=helm_answers(acr, repo_name),
     )
     step("Setting test secrets and the Azure sign-in variables")
     github.provision_test_secrets(repo)
@@ -318,7 +369,7 @@ def run_github(args: argparse.Namespace, scratch: str) -> RepoResult:
         conclusion = github.wait_for_run(repo, run_id)
         check(failures, "the publish chart run succeeds", conclusion == "success")
         version = release.stdout.strip().removeprefix("v")
-        check_chart_published(acr, args.subscription, version, failures)
+        check_chart_published(acr, args.subscription, repo_name, version, failures)
     return RepoResult(
         "Helm repo", repo, dest, failures, url=f"https://github.com/{repo}"
     )
@@ -451,19 +502,27 @@ def run_azdo(args: argparse.Namespace, scratch: str) -> RepoResult:
     org_url = f"https://dev.azure.com/{args.org}/"
     azdo.check_access(org_url, args.project)
     tenant = check_azure(args.subscription, args.resource_group)
+    if args.registry:
+        check_registry(args.registry, args.subscription)
     token = azdo.github_token()
     repo_name = f"{name_prefix(args.repo_prefix, 'azdo')}{int(time.time())}"
     dest = local_clone_dir(repo_name)
     failures: list[str] = []
 
-    heading("A Standard Azure DevOps copy at HEAD, publishing to a new registry")
-    acr, client_id, _ = create_azure_resources(
-        repo_name, args.subscription, args.resource_group
-    )
-    step(f"Creating service connection {repo_name}")
-    create_service_connection(
-        org_url, args.project, repo_name, client_id, tenant, args.subscription, scratch
-    )
+    if args.registry:
+        heading(f"A Standard Azure DevOps copy at HEAD, publishing to {args.registry}")
+        acr, connection = args.registry, args.service_connection
+    else:
+        heading("A Standard Azure DevOps copy at HEAD, publishing to a new registry")
+        acr, client_id, _ = create_azure_resources(
+            repo_name, args.subscription, args.resource_group
+        )
+        connection = repo_name
+        step(f"Creating service connection {connection}")
+        create_service_connection(
+            org_url, args.project, connection, client_id, tenant,
+            args.subscription, scratch,
+        )  # fmt: skip
     step(f"Creating {repo_name} at HEAD")
     azdo.create(
         args.source,
@@ -474,7 +533,7 @@ def run_azdo(args: argparse.Namespace, scratch: str) -> RepoResult:
         args.project,
         code_coverage=False,
         leaf=True,
-        extra_answers=helm_answers(acr, service_connection=repo_name),
+        extra_answers=helm_answers(acr, repo_name, service_connection=connection),
     )
     step("Setting test secrets")
     azdo.provision_test_secrets(
@@ -517,9 +576,11 @@ def run_azdo(args: argparse.Namespace, scratch: str) -> RepoResult:
             failures,
             "the release commit's chart run succeeds",
             result == "succeeded",
-            result,
+            # A run that never finished is likely waiting for permission to use the
+            # service connection.
+            result or "no finished run; check that the pipeline may use the connection",
         )
-        check_chart_published(acr, args.subscription, tags[-1][1:], failures)
+        check_chart_published(acr, args.subscription, repo_name, tags[-1][1:], failures)
     return RepoResult(
         "Helm repo",
         repo_name,
@@ -573,6 +634,69 @@ def find_azure_resources(
             if pattern.fullmatch(a["name"])
         ),
     ]
+
+
+def find_shared_resources(
+    args: argparse.Namespace, pattern: re.Pattern[str]
+) -> list[Deletion]:
+    """Find what runs left in an existing registry and app registration.
+
+    Returns:
+        The charts each run published to --registry, then the federated credentials
+        each run added to --client-id.
+
+    """
+    deletions: list[Deletion] = []
+    if args.registry:
+        repositories = az_json(
+            "acr", "repository", "list", "--name", args.registry,
+            "--subscription", args.subscription,
+        )  # fmt: skip
+        run_path = re.compile(rf"helm/{re.escape(CHART_ROOT)}/({pattern.pattern})/.+")
+        deletions += [
+            (
+                f"chart {args.registry}/{repository}",
+                (
+                    "az",
+                    "acr",
+                    "repository",
+                    "delete",
+                    "--name",
+                    args.registry,
+                    "--subscription",
+                    args.subscription,
+                    "--repository",
+                    repository,
+                    "--yes",
+                ),
+            )  # fmt: skip
+            for repository in repositories or []
+            if run_path.fullmatch(repository)
+        ]
+    if args.client_id:
+        credentials = az_json(
+            "ad", "app", "federated-credential", "list", "--id", args.client_id,
+            "--query", "[].{id:id,name:name}",
+        )  # fmt: skip
+        deletions += [
+            (
+                f"federated credential {c['name']}",
+                (
+                    "az",
+                    "ad",
+                    "app",
+                    "federated-credential",
+                    "delete",
+                    "--id",
+                    args.client_id,
+                    "--federated-credential-id",
+                    c["id"],
+                ),
+            )  # fmt: skip
+            for c in credentials or []
+            if pattern.fullmatch(c["name"])
+        ]
+    return deletions
 
 
 def find_github_repos(
@@ -677,11 +801,13 @@ def cleanup(args: argparse.Namespace) -> None:
     else:
         deletions = find_azdo_resources(args, pattern)
         clones = local_clones(pattern, "dev.azure.com")
-    deletions += find_azure_resources(
-        name_prefix(args.repo_prefix, args.platform),
-        args.subscription,
-        args.resource_group,
-    )
+    deletions += find_shared_resources(args, pattern)
+    if args.resource_group:
+        deletions += find_azure_resources(
+            name_prefix(args.repo_prefix, args.platform),
+            args.subscription,
+            args.resource_group,
+        )
     if not deletions and not clones:
         say("No Helm integration-test repos, Azure resources, or clones to delete.")
         return
@@ -699,6 +825,40 @@ def cleanup(args: argparse.Namespace) -> None:
     say(f"Deleted {len(deletions)} resource(s) and {deleted} local clone(s).")
     if deleted < len(clones):
         raise SystemExit(1)
+
+
+def check_args(args: argparse.Namespace) -> None:
+    """Check that the Azure arguments name either new resources or existing ones.
+
+    Raises:
+        SystemExit: if a required Azure argument is missing.
+
+    """
+    hint = "Pass it, or set {} in mise.local.toml's [env]."
+    if not args.subscription:
+        raise SystemExit(
+            "--subscription is required. "
+            + hint.format("INTEGRATION_TEST_AZURE_SUBSCRIPTION")
+        )
+    if not args.registry and not args.resource_group:
+        raise SystemExit(
+            "--resource-group is required, for the run to create a registry in; or "
+            "pass --registry to use an existing one. "
+            + hint.format("INTEGRATION_TEST_AZURE_RESOURCE_GROUP")
+        )
+    if args.registry and not args.cleanup:
+        if args.platform == "gh" and not args.client_id:
+            raise SystemExit(
+                "--registry needs --client-id on GitHub: an app registration you own "
+                "with AcrPush on the registry. "
+                + hint.format("INTEGRATION_TEST_AZURE_CLIENT_ID")
+            )
+        if args.platform == "azdo" and not args.service_connection:
+            raise SystemExit(
+                "--registry needs --service-connection on Azure DevOps: one with "
+                "AcrPush on the registry that any pipeline may use. "
+                + hint.format("INTEGRATION_TEST_AZDO_SERVICE_CONNECTION")
+            )
 
 
 def main() -> None:
@@ -727,6 +887,24 @@ def main() -> None:
         help="Resource group for the test registry",
     )
     parser.add_argument(
+        "--registry",
+        default=os.environ.get("usage_registry")
+        or os.environ.get("INTEGRATION_TEST_AZURE_REGISTRY"),
+        help="Existing registry to publish to, instead of creating one",
+    )
+    parser.add_argument(
+        "--client-id",
+        default=os.environ.get("usage_client_id")
+        or os.environ.get("INTEGRATION_TEST_AZURE_CLIENT_ID"),
+        help="GitHub: existing app registration with AcrPush on --registry",
+    )
+    parser.add_argument(
+        "--service-connection",
+        default=os.environ.get("usage_service_connection")
+        or os.environ.get("INTEGRATION_TEST_AZDO_SERVICE_CONNECTION"),
+        help="Azure DevOps: existing service connection with AcrPush on --registry",
+    )
+    parser.add_argument(
         "--owner",
         default=os.environ.get("usage_owner"),
         help="GitHub user or organization for the test repo",
@@ -752,12 +930,7 @@ def main() -> None:
         "--yes", action="store_true", help="Don't ask before --cleanup deletes."
     )
     args = parser.parse_args()
-    if not args.subscription or not args.resource_group:
-        raise SystemExit(
-            "--subscription/--resource-group are required. Pass them, or set "
-            "INTEGRATION_TEST_AZURE_SUBSCRIPTION and "
-            "INTEGRATION_TEST_AZURE_RESOURCE_GROUP in mise.local.toml's [env]."
-        )
+    check_args(args)
     log_dir = start_log(f"helm-{args.platform}")
     say(f"Logging this run to {log_dir}")
 

@@ -212,19 +212,45 @@ that release, it detects the release.*
 ## Helm Chart Publishing
 
 A separate run: the repos above are Template projects, which don't publish a chart. It
-creates a Standard repo, plus a Basic container registry and a Microsoft Entra app
-registration with AcrPush on it, and the repo signs in as that app through a federated credential for the repo's `main` branch.
+creates a Standard repo whose releases push a chart to an Azure Container Registry, signing
+in through a federated credential for the repo's `main` branch. Set up Azure in whichever
+way your account allows:
 
-- [ ] Sign in to the Azure CLI with `az login`, as an account that can create app
-  registrations and assign roles in the test resource group (such as its Owner).
-- [ ] Set the subscription and resource group for the test registry, once, in this repo's
-  `mise.local.toml`:
+=== "Create a Temporary Registry"
 
-    ```toml
-    [env]
-    INTEGRATION_TEST_AZURE_SUBSCRIPTION = "<subscription-id>"
-    INTEGRATION_TEST_AZURE_RESOURCE_GROUP = "<resource-group>"
-    ```
+    The run creates a Basic registry and a Microsoft Entra app registration with AcrPush on
+    it, in a resource group you name.
+
+    - [ ] Sign in to the Azure CLI with `az login`, as an account that can create app
+      registrations and assign roles in the resource group (such as its Owner).
+    - [ ] Set the subscription and resource group, once, in this repo's `mise.local.toml`:
+
+        ```toml
+        [env]
+        INTEGRATION_TEST_AZURE_SUBSCRIPTION = "<subscription-id>"
+        INTEGRATION_TEST_AZURE_RESOURCE_GROUP = "<resource-group>"
+        ```
+
+=== "Use an Existing Registry"
+
+    The run publishes to a registry that already exists, as an app registration you own
+    with AcrPush on the registry. Each run adds a federated credential for its repo to the
+    app, and publishes under its own `helm/integration-test/<repo>` path; cleanup removes
+    both.
+
+    - [ ] Sign in to the Azure CLI with `az login`, as an account that can pull from the
+      registry and owns the app registration.
+    - [ ] Set the subscription, registry, and app's client ID, once, in this repo's
+      `mise.local.toml`:
+
+        ```toml
+        [env]
+        INTEGRATION_TEST_AZURE_SUBSCRIPTION = "<subscription-id>"
+        INTEGRATION_TEST_AZURE_REGISTRY = "<registry>"
+        INTEGRATION_TEST_AZURE_CLIENT_ID = "<app-client-id>"
+        ```
+
+Then, either way:
 
 - [ ] Start the run:
 
@@ -237,7 +263,8 @@ registration with AcrPush on it, and the repo signs in as that app through a fed
 - [ ] When it finishes, its summary says "all checks passed": the release dispatched Helm
   (Auto): Publish Release Chart, which pushed the chart, at the release's version, to the
   registry.
-- [ ] Delete the repo, registry, and app registration, and confirm when it asks:
+- [ ] Delete what the run made, and confirm when it asks: the repo, plus the registry and app
+  registration it created, or the chart and federated credential it added to existing ones.
 
     ```sh
     mise run integration-test-helm-cleanup-gh
