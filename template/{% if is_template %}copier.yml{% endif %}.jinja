@@ -1,177 +1,647 @@
-## Initial Settings
-_min_copier_version: 9.3.1
+{%- macro double_quote_for_yaml_if_needed(value) -%}
+  {%- set _auto = value | to_yaml -%}
+  {%- if _auto.startswith("'") -%}
+    {{- value | to_yaml(default_style='"') | trim -}}
+  {%- else -%}
+    {{- value -}}
+  {%- endif -%}
+{%- endmacro -%}
+{#- This project's own docs pages live at docs_base() + page path + docs_suffix(). Points
+    at the repo's rendered Markdown when there's no hosted site, since a committed
+    docs-site/ isn't browsable from the repo host. -#}
+{%- macro docs_base() -%}
+  {%- if zensical_ghpages -%}
+    https://{{ github_repo_owner }}.github.io/{{ repo_name }}/latest/
+  {%- elif using_github -%}
+    https://github.com/{{ github_repo_owner }}/{{ repo_name }}/blob/main/docs/
+  {%- elif using_azdo -%}
+    https://dev.azure.com/{{ azdo_org }}/{{ azdo_project_encoded }}/_git/{{ repo_name }}?path=/docs/
+  {%- endif -%}
+{%- endmacro -%}
+{%- macro docs_suffix() -%}
+  {{- '/' if zensical_ghpages else '.md' -}}
+{%- endmacro -%}
+# region Copier Settings
+_answers_file: .config/copier-answers.yml
 
 _jinja_extensions:
-  # External Dependencies
-  - copier_templates_extensions.TemplateExtensionLoader
   - jinja2_shell_extension.ShellExtension
-  - jinja2_time.TimeExtension
-  # Internal Dependencies
-  - extensions/azure_devops_extension.py:AzureDevOpsExtension
-  - extensions/context.py:ContextUpdater
-  - extensions/github_extension.py:GitHubExtension
-  - extensions/path_tests_extension.py:PathTestsExtension
-  - extensions/phase_extension.py:PhaseExtension
-  - extensions/slugify_extension.py:SlugifyExtension
-  - extensions/version_extension.py:VersionExtension
-  - extensions/yaml_quote_extension.py:YamlQuoteExtension
+
+# renovate: datasource=pypi depName=copier
+_min_copier_version: "9.19.1"
+
+_message_before_copy: Thanks for using this template. See {{ docs_base() }}reference/template-questions{{ docs_suffix() }} for what each question controls.
 
 _subdirectory: template
+# endregion Copier Settings
 
-## The below variables are used to track parent/child template relationships and should not be manually adjusted.
+# region Parent Template Values - DO NOT EDIT
 parent_template_name:
   type: str
-  default: {{ project_name | quote_for_yaml }}
+  default: {{ double_quote_for_yaml_if_needed(project_name) }}
   when: false
+
 parent_template_url:
   type: str
-  default: {% if using_github %}{% if github_org %}https://github.com/{{ github_org }}/{{ repo_name }}{% else %}https://github.com/{{ github_username }}/{{ repo_name }}{% endif %}{% endif %}{% if using_azdo %}https://dev.azure.com/{{ azdo_org }}/{{ azdo_project | replace(" ","%20") }}/_git/{{ repo_name }}{% endif %}
+  default: >-
+    {% if using_github -%}
+      https://github.com/{{ github_repo_owner }}/{{ repo_name }}
+    {%- elif using_azdo -%}
+      https://dev.azure.com/{{ azdo_org }}/{{ azdo_project_encoded }}/_git/{{ repo_name }}
+    {%- endif %}
   when: false
 
+# Where this template's own docs pages live, as parent_template_docs_url + page path
+# (e.g. reference/token-permissions) + parent_template_docs_suffix. Used in copy/update
+# messages, which print before a new project's own docs are published.
+parent_template_docs_url:
+  type: str
+  default: "{{ docs_base() }}"
+  when: false
+
+parent_template_docs_suffix:
+  type: str
+  default: "{{ docs_suffix() }}"
+  when: false
+# endregion Parent Template Values - DO NOT EDIT
 {%- raw %}
 
-## Questions
-author_name:
-  type: str
-  help: The name to whom this project will be credited. Autodetect attempted from Git 'user.name'.
-  default: "{{ 'git config --global user.name' | shell() | trim }}"
+# region Migrations
+# None of these has a `version:` gate. Copier checks a gate against the version of
+# the template a project updates from, and a child template inheriting these has its
+# own version numbers, so a gate set for this template's releases would misfire for
+# its descendants. Each one runs on every update instead, so it must be safe to rerun.
+_migrations:
+  # region Backfill Legacy Version Into knope-current-version.json (all versions)
+  # v0.8.0 replaced release-please (GitHub) and commitizen (Azure DevOps) with Knope,
+  # which tracks the version in knope-current-version.json. Those tools, and the
+  # commit-and-tag-version before them, all tagged releases `vX.Y.Z` as Knope does, so
+  # the latest such tag is the real version. A project receives the file with a "0.0.0"
+  # placeholder, and this overwrites only that placeholder. The same command runs as a
+  # copy task (see _tasks) for an existing project with release tags already in place.
+  - command: &seed_version_from_tag
+      - "{{ _copier_python }}"
+      - -c
+      - |
+        import json
+        import re
+        import subprocess
+        import sys
+        from pathlib import Path
 
+        version_file = Path(".config/knope-current-version.json")
+        if version_file.is_file():
+            try:
+                current = json.loads(
+                    version_file.read_text(encoding="utf-8")
+                ).get("version")
+            except (json.JSONDecodeError, OSError):
+                current = None
+            if current != "0.0.0":
+                sys.exit(0)
+
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*"],
+            capture_output=True, text=True, check=False,
+        )
+        tag = result.stdout.strip()
+        if result.returncode != 0 or not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+            sys.exit(0)
+        version = tag[1:]
+
+        version_file.parent.mkdir(exist_ok=True)
+        version_file.write_text(
+            json.dumps(
+                {
+                    "_comment": "Managed by Knope; do not edit manually.",
+                    "version": version,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        print(f"Seeded knope-current-version.json with {version!r} from the latest release tag.")
+    when: "{{ _stage == 'after' }}"
+  # endregion Backfill Legacy Version Into knope-current-version.json (all versions)
+
+  # region Knope Changelog Reformatter (all versions)
+  # release-please wrote CHANGELOG.md headings as `## [X.Y.Z](url) (date)`, which
+  # Knope can't parse: without a heading it recognizes, it appends new releases at the
+  # end of the file. This rewrites them as `## X.Y.Z (date)`. A heading already in that
+  # form doesn't match, so rerunning it changes nothing.
+  - command:
+      - "{{ _copier_python }}"
+      - -c
+      - |
+        import re
+        from pathlib import Path
+
+        path = Path("CHANGELOG.md")
+        if path.is_file():
+            with path.open(encoding="utf-8", newline="") as f:
+                content = f.read()
+            new_content, count = re.subn(
+                r"^## \[(\d+\.\d+\.\d+)\]\([^)]+\) (\(\d{4}-\d{2}-\d{2}\))$",
+                r"## \1 \2",
+                content,
+                flags=re.MULTILINE,
+            )
+            if count:
+                path.write_text(new_content, encoding="utf-8", newline="")
+                print(f"Reformatted {count} changelog heading(s) for Knope.")
+    when: "{{ _stage == 'after' }}"
+  # endregion Knope Changelog Reformatter (all versions)
+
+  # region Reminder to Remove REPO_MAINTENANCE_PAT (all versions)
+  # v0.8.2 dropped REPO_MAINTENANCE_PAT: the GitHub workflows that used it run as the
+  # default GITHUB_TOKEN, at the cost of a manual approval for each bot-authored push.
+  # A project updating past v0.8.2 may still have the secret set. This checks with
+  # `gh secret list` and prints a reminder only when it's there, and exits quietly
+  # without `gh`, so the update and the changeset generator after it still run.
+  - command:
+      - "{{ _copier_python }}"
+      - -c
+      - |
+        import shutil, subprocess, sys
+
+        if not shutil.which("gh"):
+            sys.exit(0)
+        try:
+            result = subprocess.run(
+                ["gh", "secret", "list", "--json", "name"],
+                capture_output=True, text=True, check=False,
+            )
+        except OSError:
+            sys.exit(0)
+        if result.returncode == 0 and '"REPO_MAINTENANCE_PAT"' in result.stdout:
+            print(
+                "REPO_MAINTENANCE_PAT is no longer used by this template's GitHub "
+                "workflows. Delete it from Settings > Secrets and variables > "
+                "Actions, and revoke the token itself at "
+                "https://github.com/settings/tokens if you're not using it "
+                "elsewhere. See {{ parent_template_docs_url }}maintaining/upgrading-from-0x{{ parent_template_docs_suffix }} "
+                "for what changed."
+            )
+    when: "{{ _stage == 'after' and using_github }}"
+  # endregion Reminder to Remove REPO_MAINTENANCE_PAT (all versions)
+
+  # region Upstream Change to Changeset Generator (all versions)
+  # Writes a changeset for each relevant upstream change, so it reaches this project's
+  # changelog instead of disappearing into a "chore: apply parent template" commit. It
+  # runs Knope's compute-upstream-bump workflow in a temporary clone of the template,
+  # with every tag but this project's pre-update version removed so Knope's "most
+  # recent tag" baseline lands on that version; see the workflow's comment in
+  # knope.toml. It writes nothing when no upstream commit is release-worthy.
+  - command:
+      - "{{ _copier_python }}"
+      - -c
+      - |
+        import hashlib
+        import re
+        import shutil
+        import subprocess
+        import sys
+        import tempfile
+        import tomllib
+        from pathlib import Path
+        from urllib.parse import unquote
+
+        version_from, version_to, src_path, upstream = (
+            sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4],
+        )
+        if version_from == version_to:
+            sys.exit(0)
+
+        def run(*args, cwd=None, check=True):
+            return subprocess.run(
+                args, cwd=cwd, check=check, capture_output=True,
+                encoding="utf-8", errors="replace",
+            )
+
+        scratch = Path(tempfile.mkdtemp())
+        try:
+            run("git", "clone", "--quiet", src_path, str(scratch))
+            tags = run("git", "tag", cwd=scratch).stdout.split()
+            if version_from not in tags:
+                print(
+                    f"Note: {version_from} isn't a tag in {upstream}, so no changesets "
+                    "were generated for this update."
+                )
+                sys.exit(0)
+            run("git", "checkout", "--quiet", version_to, cwd=scratch)
+            for tag in tags:
+                if tag != version_from:
+                    run("git", "tag", "-d", tag, cwd=scratch, check=False)
+
+            # Emptied first: compute-upstream-bump works from tags and commits, not the
+            # changelog, so nothing is lost, and the new entry is then the only one in
+            # the file for the extraction below to read.
+            (scratch / "CHANGELOG.md").write_text("", encoding="utf-8")
+
+            result = run(
+                "mise", "x", "--", "knope", "compute-upstream-bump",
+                cwd=scratch, check=False,
+            )
+            if result.returncode != 0:
+                # Nothing release-worthy upstream is a normal outcome; anything else
+                # means changesets were silently lost, so say so.
+                output = result.stdout + result.stderr
+                if "releases::no_release" not in output:
+                    lines = [line.strip() for line in output.splitlines() if line.strip()]
+                    # Knope marks the error itself with U+00D7; fall back to its last line.
+                    reason = next(
+                        (line.lstrip("\u00d7 ") for line in lines if line.startswith("\u00d7")),
+                        lines[-1] if lines else f"knope exited {result.returncode}",
+                    )
+                    print(f"Warning: couldn't generate changesets for this update ({reason}).")
+                sys.exit(0)
+
+            with (scratch / "CHANGELOG.md").open(encoding="utf-8", newline="") as f:
+                entry = f.read().strip()
+            body = entry.split("\n", 1)[1].strip() if "\n" in entry else ""
+
+            # knope.toml's `extra_changelog_sections` can rename Knope's default
+            # sections (Breaking Changes, Features, Fixes), so read the upstream's
+            # config instead of assuming the defaults.
+            section_names = {
+                "major": "Breaking Changes",
+                "minor": "Features",
+                "patch": "Fixes",
+            }
+            knope_toml_path = scratch / "knope.toml"
+            if knope_toml_path.is_file():
+                knope_config = tomllib.loads(
+                    knope_toml_path.read_text(encoding="utf-8")
+                )
+                for override in knope_config.get("package", {}).get(
+                    "extra_changelog_sections", []
+                ):
+                    name = override.get("name")
+                    if not name:
+                        continue
+                    for bump in section_names:
+                        if bump in override.get("types", []):
+                            section_names[bump] = name
+
+            sections = tuple(section_names.items())
+            section_pattern = re.compile(
+                r"^### ("
+                + "|".join(re.escape(name) for name in section_names.values())
+                + r")\s*\n(.*?)(?=^### |\Z)",
+                re.MULTILINE | re.DOTALL,
+            )
+            found = {
+                heading: content.strip()
+                for heading, content in section_pattern.findall(body)
+            }
+
+            # Knope turns a multi-line changeset's first line into a "###" heading, so
+            # one file per change keeps the changelog a flat list.
+            #
+            # Each bullet links to where it came from. GitHub's bare "(#1234)"
+            # squash-merge suffix becomes a repo-qualified link ("owner/repo#1234");
+            # Azure DevOps has no such suffix, so its bullets link to the source repo.
+            # A bullet that already ends in a link was attributed at an earlier hop
+            # (such as a grandparent template) and stays as it is.
+            github_match = re.match(
+                r"^gh:([^/\s]+)/([^/\s]+)$", upstream
+            ) or re.search(r"github\.com[:/]+([^/\s]+)/([^/\s.]+)", upstream)
+            azdo_match = re.search(
+                r"dev\.azure\.com/([^/\s]+)/([^/\s]+)/_git/([^/\s]+)", upstream
+            )
+            already_attributed = re.compile(r"\]\([^)]+\)\)?\s*$")
+            pr_ref_pattern = re.compile(r"\(#(\d+)\)\s*$")
+
+            def attribute(text):
+                if already_attributed.search(text):
+                    return text
+                if github_match:
+                    owner, repo = github_match.group(1), github_match.group(2)
+                    ref = pr_ref_pattern.search(text)
+                    if ref:
+                        n = ref.group(1)
+                        return pr_ref_pattern.sub(
+                            f"([{owner}/{repo}#{n}]"
+                            f"(https://github.com/{owner}/{repo}/issues/{n}))",
+                            text,
+                        )
+                    return (
+                        f"{text} ([{owner}/{repo}]"
+                        f"(https://github.com/{owner}/{repo}))"
+                    )
+                if azdo_match:
+                    org, project, repo = azdo_match.groups()
+                    display = f"{unquote(project)}/{repo}"
+                    url = f"https://dev.azure.com/{org}/{project}/_git/{repo}"
+                    return f"{text} ([{display}]({url}))"
+                return text
+
+            changeset_dir = Path(".changeset")
+            changeset_dir.mkdir(exist_ok=True)
+            written = 0
+            for bump, heading in sections:
+                content = found.get(heading)
+                if not content:
+                    continue
+                entries = []
+                for line in content.splitlines():
+                    if line.startswith("- "):
+                        entries.append(line[2:])
+                    elif entries:
+                        entries[-1] += " " + line.strip()
+                for entry in entries:
+                    entry = attribute(entry.strip())
+                    ref = re.search(r"#(\d+)", entry)
+                    ident = (
+                        ref.group(1) if ref
+                        else hashlib.sha1(entry.encode()).hexdigest()[:8]
+                    )
+                    filename = (
+                        f"template-update-{version_to.lstrip('v')}-{bump}-{ident}.md"
+                    )
+                    # The summary is a heading, as `knope document-change` writes it
+                    (changeset_dir / filename).write_text(
+                        f"---\ndefault: {bump}\n---\n\n# {entry}\n",
+                        encoding="utf-8",
+                        newline="",
+                    )
+                    written += 1
+
+            if written:
+                print(f"Added {written} changeset(s) from {upstream} {version_to}.")
+        finally:
+            shutil.rmtree(scratch, ignore_errors=True)
+      - "{{ _version_from }}"
+      - "{{ _version_to }}"
+      - "{{ _copier_conf.src_path }}"
+      - "{{ _src_path }}"
+    when: "{{ _stage == 'after' }}"
+  # endregion Upstream Change to Changeset Generator (all versions)
+# endregion Migrations
+
+# region Pre-Question Computed Values
+lifecycle_previous:
+  # The lifecycle answer from before this run, for the lifecycle question's validator.
+  type: str
+  default: "{{ lifecycle | default('') }}"
+  when: false
+# endregion Pre-Question Computed Values
+
+# region Questions
 developer_platform:
   type: str
-  help: The platform where you are going to host your Git repo and CI/CD. This value should not be changed on update.
+  help: |-
+    Where to host the Git repo and CI/CD. Azure DevOps support is deprecated; use GitHub
+    unless you need Azure DevOps.
+  ask: "{{ not project_initialized }}"
   choices:
-    GitHub:
-      value: GitHub
-      validator: Not Currently Implemented
-    Azure DevOps:
-      value: Azure DevOps
+    - GitHub
+    - Azure DevOps
+  default: GitHub
 
-# Restore validators once https://github.com/copier-org/copier/issues/1050 is resolved
-repo_actions:
+repo_setup_actions:
   type: str
-  help: If you are making a new project and want to have this template create the repo, choose 'Create Repo'. If you are applying this template to an existing project and want to just set repository rules, choose 'Set Repo Rules'. If this is an update run, or you want don't want the template to do any repo-related automations, choose 'None'.
+  help: |-
+    New project: 'Create Repo'. Existing project: 'Set Repo Rules' on GitHub, 'None' on Azure DevOps. No setup: 'None'.
+  ask: "{{ not project_initialized }}"
   choices:
     Create Repo:
       value: Create Repo
-      # validator: "{% if path_exists(_copier_conf.dst_path) %}Destination Folder Exists{% endif %}"
     Set Repo Rules:
       value: Set Repo Rules
-      # validator: "{% if path_missing(_copier_conf.dst_path) %}Destination Folder Missing{% endif %}"
+      # Azure DevOps registers pipelines from YAML on the remote main, which an existing
+      # project hasn't pushed at copy time.
+      validator: |-
+        {%- if developer_platform == 'Azure DevOps' -%}
+          Not Supported on Azure DevOps: choose None, push the generated files, then follow {{ parent_template_docs_url }}reference/manual-repo-settings{{ parent_template_docs_suffix }}
+        {%- endif %}
     None:
       value: None
-
-github_token:
-  type: str
-  secret: true
-  default: ""
-  help: A GitHub Personal Access Token which will be used to {% if repo_actions == 'Create Repo' %}initialize your new repository and apply rules.{% else %}apply rules to your existing repo.{% endif %} Value is not saved.
-  when: "{{ developer_platform == 'GitHub' and repo_actions != 'None' }}"
-  validator: "{% if github_token is not valid_gh_token and (developer_platform == 'GitHub' and repo_actions != 'None') %}GitHub Token Invalid{% endif %}"
+  default: Create Repo
+  # Checks that the platform's CLI is installed and logged in.
+  validator: |-
+    {%- if not project_initialized and repo_setup_actions != 'None' -%}
+      {%- if developer_platform == 'GitHub' -%}
+        {%- set gh_check = ('gh --version && echo GH_INSTALLED' | shell()) -%}
+        {%- if 'GH_INSTALLED' not in gh_check -%}
+          GitHub CLI ('gh') is not installed or not on PATH. Install it, then try again.
+        {%- else -%}
+          {%- set gh_auth_check = ('gh api user --jq .login && echo GH_AUTHED' | shell()) -%}
+          {%- if 'GH_AUTHED' not in gh_auth_check -%}
+            GitHub CLI ('gh') is installed but not authenticated. Run 'gh auth login', then try again.
+          {%- elif repo_setup_actions == 'Create Repo' -%}
+            {%- set knope_check = ('knope --version && echo KNOPE_INSTALLED' | shell()) -%}
+            {%- if 'KNOPE_INSTALLED' not in knope_check -%}
+              Knope ('knope') is not installed or not on PATH. Install it (see https://knope.tech/), then try again.
+            {%- endif -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- elif developer_platform == 'Azure DevOps' -%}
+        {%- set az_check = ('az --version && echo AZ_INSTALLED' | shell()) -%}
+        {%- if 'AZ_INSTALLED' not in az_check -%}
+          Azure CLI ('az') is not installed. Install it (see https://learn.microsoft.com/cli/azure/install-azure-cli), then try again.
+        {%- else -%}
+          {%- set az_ext_check = ('az extension show --name azure-devops && echo AZ_EXT_INSTALLED' | shell()) -%}
+          {%- if 'AZ_EXT_INSTALLED' not in az_ext_check -%}
+            Azure CLI is installed but the azure-devops extension isn't. Run 'az extension add --name azure-devops', then try again.
+          {%- else -%}
+            {%- set az_auth_check = ('az account show && echo AZ_AUTHED' | shell()) -%}
+            {%- if 'AZ_AUTHED' not in az_auth_check -%}
+              Azure CLI is installed but not logged in. Run 'az login', then try again.
+            {%- elif repo_setup_actions == 'Create Repo' -%}
+              {%- set knope_check = ('knope --version && echo KNOPE_INSTALLED' | shell()) -%}
+              {%- if 'KNOPE_INSTALLED' not in knope_check -%}
+                Knope ('knope') is not installed or not on PATH. Install it (see https://knope.tech/), then try again.
+              {%- endif -%}
+            {%- endif -%}
+          {%- endif -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endif -%}
 
 github_username:
   type: str
-  help: Your GitHub username. Repo will be created under this user unless an org is specified. Autodetect attempted from Git 'user.email'. This value should not be changed on update.
+  help: |-
+    Your GitHub username; the repo is created under it unless you name an org. Defaults to the username in your Git 'user.email'.
+  ask: "{{ not project_initialized }}"
+  # Assumes GitHub's noreply email form (12345+username@users.noreply.github.com). Any
+  # other "+"-tagged email (such as user+tag@gmail.com) defaults to the tag instead.
   default: "{{ (('git config --global user.email' | shell()).split('+') | last).split('@') | first }}"
   when: "{{ developer_platform == 'GitHub' }}"
 
 github_org:
   type: str
-  help: (OPTIONAL) If this repo {% if repo_actions == 'Create Repo' %}should be created under{% else %}is part of{% endif %} a GitHub organization, supply its name here. This value should not be changed on update.
+  help: |-
+    The GitHub organization that owns the repo, or 'None' to create it under your username.
+  ask: "{{ not project_initialized }}"
+  default: None
   when: "{{ developer_platform == 'GitHub' }}"
 
 azdo_org:
   type: str
-  help: The Azure DevOps organization to use for the new project. This value should not be changed on update.
+  help: |-
+    The Azure DevOps organization for the repo.
+  ask: "{{ not project_initialized }}"
   when: "{{ developer_platform == 'Azure DevOps' }}"
-  validator: "{% if azdo_org is not extant_azdo_org %}Azure DevOps Organization Does Not Exist{% endif %}"
-
-azdo_token:
-  type: str
-  secret: true
-  default: ""
-  help: An Azure DevOps Personal Access Token which will be used to {% if repo_actions == 'Create Repo' %}initialize your new repository and apply rules.{% else %}apply rules to your existing repo.{% endif %} Value is not saved.
-  when: "{{ developer_platform == 'Azure DevOps' and repo_actions != 'None' }}"
-  validator: "{% if azdo_token is not valid_azdo_token_for_org(azdo_org) and (developer_platform == 'Azure DevOps' and repo_actions != 'None') %}Azure DevOps Token Invalid{% endif %}"
 
 azdo_project:
   type: str
-  help: An Azure DevOps project in organization '{{ azdo_org }}'. This value should not be changed on update.
+  help: |-
+    The Azure DevOps project for the repo.
+  ask: "{{ not project_initialized }}"
   when: "{{ developer_platform == 'Azure DevOps' }}"
 
 repo_name:
   type: str
-  help: The name of this project's Git repository. Will be {% if repo_actions == 'Create Repo' %}created{% else %}reused{% endif %} by this template. This value should not be changed on update.
-  # Validator is currently disabled as it is buggy on updates
-  # validator: |
-  #   {% if repo_actions == 'Create Repo' -%}
-  #     {%- if developer_platform == 'GitHub' -%}
-  #       {%- if repo_name is not available_gh_repo_name_for_owner(github_username) -%}
-  #         GitHub Repo {{ github_username }}/{{ repo_name }} already exists
-  #       {%- endif -%}
-  #     {%- elif developer_platform == 'Azure DevOps' -%}
-  #       {%- if repo_name is not available_azdo_repo_name_for_token_and_org_and_project(azdo_token, azdo_org, azdo_project) -%}
-  #         Azure Devops Repo {{ azdo_org }}/{{ azdo_project }}/{{ repo_name }} already exists
-  #       {%- endif -%}
-  #     {%- endif -%}
-  #   {%- else -%}
-  #     {%- if developer_platform == 'GitHub' -%}
-  #       {%- if repo_name is available_gh_repo_name_for_owner(github_username) -%}
-  #         GitHub Repo {{ github_username }}/{{ repo_name }} does not exist
-  #       {%- endif -%}
-  #     {%- elif developer_platform == 'Azure DevOps' -%}
-  #       {%- if repo_name is available_azdo_repo_name_for_token_and_org_and_project(azdo_token, azdo_org, azdo_project) -%}
-  #         Azure Devops Repo {{ azdo_org }}/{{ azdo_project }}/{{ repo_name }} does not exist
-  #       {%- endif -%}
-  #     {%- endif -%}
-  #   {%- endif %}
+  help: |-
+    The Git repo's name. Defaults to the destination folder's name.
+  ask: "{{ not project_initialized }}"
+  default: "{{ _copier_conf.dst_path | realpath | basename }}"
+  validator: |-
+    {%- if not (repo_name | regex_search('^[A-Za-z0-9._-]+$')) -%}
+      Repo names may only contain letters, digits, '.', '_', and '-'.
+    {%- endif -%}
+
+author_name:
+  type: str
+  help: Who the project is credited to. Defaults to your Git 'user.name'.
+  default: "{{ 'git config --global user.name' | shell() | trim }}"
+
+{%- endraw %}
+{#- A leaf template's projects are always Standard, so its copier.yml has no
+    project-type questions or computed values, and no copy-template-files task. #}
+{%- if is_extensible %}
+{%- raw %}
 
 project_type:
   type: str
-  help: If you are creating another Copier template that will inherit from this one, choose Template. Otherwise, choose Standard. This value should not be changed on update.
+  help: |-
+    Standard for a project repo; Template for a child Copier template.
+  ask: "{{ not project_initialized }}"
   choices:
     - Standard
     - Template
+  default: Standard
+
+# Defaults to no on a new copy (most templates are leaf templates) and to yes for an
+# existing Template project, which was extensible before this question existed. No
+# `ask:` yet, so every existing Template project answers it once on its next update.
+extensible_template:
+  type: bool
+  help: |-
+    Will other Copier templates be built from this one? No makes a leaf template, whose projects are always Standard; yes makes an extensible template.
+  default: "{{ project_initialized | default(false) }}"
+  when: "{{ project_type == 'Template' }}"
+{%- endraw %}
+{%- endif %}
+{%- raw %}
 
 project_name:
   type: str
-  help: The friendly name of the project that will be used in documentation.
+  help: The project's display name; capitals and spaces are fine.
+  validator: |-
+    {%- if '"' in project_name or '\\' in project_name -%}
+      The project name can't contain '"' or '\', since it's written into quoted TOML/YAML strings.
+    {%- endif -%}
 
-project_short_description:
+project_description:
   type: str
-  help: Enter a short description of your project to be used in documentation.
-
-project_website:
-  type: str
-  help: (OPTIONAL) Enter the website for your project.
+  help: A one- or two-sentence description, used in docs and packaging.
+  validator: |-
+    {%- if '"' in project_description or '\\' in project_description -%}
+      The project description can't contain '"' or '\', since it's written into quoted TOML/YAML strings.
+    {%- endif -%}
 
 project_visibility:
   type: str
-  help: Choose if you want this project to be Public or Private. This value should not be changed on update.
+  help: |-
+    Public (open source) or Private.
+  ask: "{{ not project_initialized }}"
   choices:
     Public:
       value: Public
-      validator: "{% if developer_platform == 'Azure DevOps' %}Not Supported on Azure DevOps{% endif %}"
+      validator: |-
+        {%- if developer_platform == 'Azure DevOps' -%}
+          Not Supported on Azure DevOps: choose Private
+        {%- endif %}
     Private:
       value: Private
+  default: |-
+    {%- if developer_platform == 'Azure DevOps' -%}
+      Private
+    {%- else -%}
+      Public
+    {%- endif %}
 
 license:
   type: str
-  help: Choose if you wish to use The MIT License for this project or provide your own.
+  help: Choose the license for this project.
   choices:
-    - MIT
-    - Provide Own
-  when: "{{ project_visibility == 'Public' }}"
+    MIT:
+      value: MIT
+      validator: |-
+        {%- if project_visibility == 'Private' -%}
+          Not Supported on Private repos: choose None
+        {%- endif %}
+    None:
+      value: None
+  default: |-
+    {%- if project_visibility == 'Private' -%}
+      None
+    {%- else -%}
+      MIT
+    {%- endif %}
+
+zensical_target:
+  type: str
+  help: |-
+    Where to publish the docs.
+  ask: "{{ not project_initialized }}"
+  choices:
+    GitHub Pages:
+      value: GitHub Pages
+      validator: |-
+        {%- if developer_platform == 'Azure DevOps' -%}
+          Not Supported on Azure DevOps: choose docs-site Directory in Repo
+        {%- endif %}
+    docs-site Directory in Repo:
+      value: docs-site Directory in Repo
+  default: |-
+    {%- if developer_platform == 'Azure DevOps' -%}
+      docs-site Directory in Repo
+    {%- else -%}
+      GitHub Pages
+    {%- endif %}
 
 lifecycle:
   type: str
-  help: Choose what state this project is in.
+  help: The project's current stage.
   choices:
     - Pre-Alpha
     - Alpha
     - Beta
     - Stable
     - Inactive
+  validator: |-
+    {%- set _rank = {"Pre-Alpha": 0, "Alpha": 1, "Beta": 2, "Stable": 3} -%}
+    {%- if lifecycle_previous in _rank and lifecycle in _rank and _rank[lifecycle] < _rank[lifecycle_previous] -%}
+      Can't move from '{{ lifecycle_previous }}' back to '{{ lifecycle }}': lifecycle only moves forward (Pre-Alpha -> Alpha -> Beta -> Stable). 'Inactive' is a separate state, reachable from any of these.
+    {%- endif -%}
 
+agent_instructions:
+  type: bool
+  help: Generate AGENTS.md with instructions for AI coding agents.
+  default: true
+
+code_coverage:
+  type: bool
+  help: Publish code coverage through Codecov (GitHub) or Azure Pipelines (Azure DevOps). This publishes a Cobertura coverage.xml from the repo root; your test command produces it.
+  default: false
+# endregion Questions
+
+# region Helm Chart Questions
 container_registry_type:
   type: str
   help: Choose what type of container registry this repo should deploy to.
@@ -206,80 +676,647 @@ helm_chart_name:
   type: str
   help: The name of the helm chart. (Make it something that will be globally unique.)
   when: "{{ project_type == 'Standard' }}"
+# endregion Helm Chart Questions
 
-## Computed Values
-
+# region Post-Question Computed Values
 using_github:
   type: bool
-  default: "{% if developer_platform == 'GitHub' %}true{% endif %}"
+  default: |-
+    {%- if developer_platform == 'GitHub' -%}
+      true
+    {%- endif %}
+  when: false
+
+github_repo_owner:
+  type: str
+  default: |-
+    {%- if github_org and github_org != 'None' -%}
+      {{ github_org }}
+    {%- else -%}
+      {{ github_username }}
+    {%- endif %}
   when: false
 
 using_azdo:
   type: bool
-  default: "{% if developer_platform == 'Azure DevOps' %}true{% endif %}"
+  default: |-
+    {%- if developer_platform == 'Azure DevOps' -%}
+      true
+    {%- endif %}
+  when: false
+
+azdo_project_encoded:
+  type: str
+  default: "{{ azdo_project | urlencode }}"
   when: false
 
 using_mit:
   type: bool
-  default: "{% if license == 'MIT' %}true{% endif %}"
+  default: |-
+    {%- if license == 'MIT' -%}
+      true
+    {%- endif %}
   when: false
 
 is_public:
   type: bool
-  default: "{% if project_visibility == 'Public' %}true{% endif %}"
+  default: |-
+    {%- if project_visibility == 'Public' -%}
+      true
+    {%- endif %}
   when: false
+
+is_private:
+  type: bool
+  default: |-
+    {%- if project_visibility == 'Private' -%}
+      true
+    {%- endif %}
+  when: false
+{%- endraw %}
+{%- if is_extensible %}
+{%- raw %}
 
 is_standard:
   type: bool
-  default: "{% if project_type == 'Standard' %}true{% endif %}"
+  default: |-
+    {%- if project_type == 'Standard' -%}
+      true
+    {%- endif %}
   when: false
 
 is_template:
   type: bool
-  default: "{% if project_type == 'Template' %}true{% endif %}"
+  default: |-
+    {%- if project_type == 'Template' -%}
+      true
+    {%- endif %}
   when: false
 
-is_prerelease:
+# An extensible template, whose own projects can be templates too. A leaf template
+# gets the parent's template/ without the template-only files.
+is_extensible:
   type: bool
-  default: "{% if lifecycle == 'Pre-Alpha' or lifecycle == 'Alpha' or lifecycle == 'Beta' %}true{% endif %}"
+  default: |-
+    {%- if project_type == 'Template' and extensible_template -%}
+      true
+    {%- endif %}
+  when: false
+{%- endraw %}
+{%- endif %}
+{%- raw %}
+
+lifecycle_is_pre_stable:
+  type: bool
+  default: |-
+    {%- if lifecycle == 'Pre-Alpha' or lifecycle == 'Alpha' or lifecycle == 'Beta' -%}
+      true
+    {%- endif %}
   when: false
 
 should_create_repo:
   type: bool
-  default: "{% if repo_actions == 'Create Repo' %}true{% endif %}"
+  default: |-
+    {%- if repo_setup_actions == 'Create Repo' -%}
+      true
+    {%- endif %}
   when: false
 
 should_set_repo_settings:
   type: bool
-  default: "{% if repo_actions == 'Create Repo' or repo_actions == 'Set Repo Rules' %}true{% endif %}"
+  default: |-
+    {%- if repo_setup_actions == 'Create Repo' or repo_setup_actions == 'Set Repo Rules' -%}
+      true
+    {%- endif %}
   when: false
 
-## Tasks
+zensical_ghpages:
+  type: bool
+  default: |-
+    {%- if zensical_target == 'GitHub Pages' -%}
+      true
+    {%- endif %}
+  when: false
 
+zensical_repo:
+  type: bool
+  default: |-
+    {%- if zensical_target == 'docs-site Directory in Repo' or using_azdo -%}
+      true
+    {%- endif %}
+  when: false
+
+# Where this project's own docs pages are published: `<url><page><suffix>`. A
+# section index page is `<url><section>/index.html` under either target.
+docs_url:
+  type: str
+  default: |-
+    {%- if zensical_ghpages -%}
+      https://{{ github_repo_owner }}.github.io/{{ repo_name }}/latest/
+    {%- else -%}
+      docs-site/
+    {%- endif %}
+  when: false
+
+docs_page_suffix:
+  type: str
+  default: "{{ '/' if zensical_ghpages else '.html' }}"
+  when: false
+
+# The GitHub Pages site root, for links to the docs as a whole (README, repo
+# homepage). It redirects to the current version, so unlike docs_url it doesn't
+# depend on the versioning scheme's path layout.
+docs_root:
+  type: str
+  default: "{{ 'https://' ~ github_repo_owner ~ '.github.io/' ~ repo_name ~ '/' if zensical_ghpages else '' }}"
+  when: false
+
+current_knope_version:
+  type: str
+  default: |-
+    {%- set _version_file_raw = (('git -C "' ~ _copier_conf.dst_path ~ '" show HEAD:.config/knope-current-version.json 2>&1') | shell()) -%}
+    {%- if '"version"' in _version_file_raw -%}
+      {{- (_version_file_raw | from_json).version -}}
+    {%- endif -%}
+  when: false
+
+current_knope_version_is_pre_1:
+  type: bool
+  default: |-
+    {%- if current_knope_version.split('.')[0] == '0' -%}
+      true
+    {%- endif %}
+  when: false
+
+setup_checklist:
+  type: str
+  default: |-
+    - [ ] Add or remove badges at the top of README.md.
+    - [ ] Replace docs/assets/images/readme-logo.png with your own logo, or remove that section from README.md.
+    - [ ] Replace docs/assets/images/readme-screenshot.png with a screenshot of your project, or remove that section from README.md.
+    - [ ] Set the required secrets: run `mise run provision-secrets`, or see {{ parent_template_docs_url }}reference/token-permissions{{ parent_template_docs_suffix }}.
+    {%- if using_github %}
+    - [ ] If the Renovate GitHub App only has access to selected repositories, add this one.
+    - [ ] When Renovate opens its **Dependency Dashboard** issue, pin it (**Pin issue** in the sidebar) to keep it at the top of the Issues tab.
+    - [ ] On the first release PR, approve its PR Validation run (**Approve and run workflow**); GitHub holds runs on bot-opened PRs until someone approves them.
+    {%- endif %}
+    - [ ] Merge the first release PR once PR Validation passes.
+    {%- if is_public and license == 'None' %}
+    - [ ] Add a license. Without one, nobody may legally use, copy, modify, or distribute this code without your permission.
+    {%- endif %}
+  when: false
+# endregion Post-Question Computed Values
+
+# region Locked Values
+copyright_year:
+  type: str
+  default: "{{ copyright_year | default('%Y' | strftime) }}"
+  when: false
+# endregion Locked Values
+
+# region Tasks
 _tasks:
-  - command: invoke copy-template-files --answers-json '{{ _copier_answers | to_json }}'
-    when: "{% if is_template %}true{% endif %}"
-  - command: invoke create-repo-github --answers-json '{{ _copier_answers | to_json }}'
-    when: "{% if should_create_repo and using_github %}true{% endif %}"
-  - command: invoke create-repo-azdo --answers-json '{{ _copier_answers | to_json }}'
-    when: "{% if should_create_repo and using_azdo %}true{% endif %}"
-  - command: invoke set-repo-settings-github --answers-json '{{ _copier_answers | to_json }}'
-    when: "{% if should_set_repo_settings and using_github %}true{% endif %}"
-  - command: invoke initialize-repo-and-commit-files --answers-json '{{ _copier_answers | to_json }}'
-    when: "{% if should_create_repo %}true{% endif %}"
-  - command: invoke set-branch-protection-ruleset-github --answers-json '{{ _copier_answers | to_json }}'
-    when: "{% if should_set_repo_settings and using_github %}true{% endif %}"
-  - command: invoke create-pipelines-azdo --answers-json '{{ _copier_answers | to_json }}'
-    when: "{% if should_set_repo_settings and using_azdo %}true{% endif %}"
-  - invoke delete-unneeded-template-files
-
-_message_after_update: >-
-  {% if lifecycle == 'Stable' and developer_platform == 'GitHub' and current_release_please_version_is_pre_1 %}
-  It looks like you have switched this project's lifecycle to 'Stable' for the first time. If this is true, merge the following commit to main to have Release Please bump the version number properly.
-
-  git commit --allow-empty -m "chore: bump version to v1.0.0" -m "Release-As: 1.0.0"
-  {% endif %}
-
+  # For an existing project, seeds knope-current-version.json from its latest vX.Y.Z
+  # tag (the backfill migration shares this command), so the first release continues
+  # from there instead of from 0.0.0.
+  - command: *seed_version_from_tag
+    when: "{{ _copier_operation == 'copy' }}"
 {%- endraw %}
----
-!include copier-question-overrides.yml
+{%- if is_extensible %}
+{%- raw %}
+
+  # Makes nested templates work: every Template project gets an unrendered copy of
+  # the parent's template/ directory, read from Copier's own clone of the parent at the
+  # version being rendered. A leaf template's copy leaves out the paths gated on
+  # is_template or is_extensible, since its own projects are never templates, and has
+  # those gates folded out of the files it keeps. copytree only adds and overwrites, so
+  # on update this also removes the files the parent deleted or renamed since the
+  # previous version, which it reads from the answers file committed at HEAD.
+  - command:
+      - "{{ _copier_python }}"
+      - -c
+      - |
+        import importlib.machinery, importlib.util, os, pathlib, re, shutil, subprocess, sys, tempfile
+        src, answers_file, extensible = sys.argv[1:4]
+        # Split so Copier doesn't read them as Jinja tags when it renders this task.
+        template_only = ("{" + "% if is_template %" + "}", "{" + "% if is_extensible %" + "}")
+        folder = None
+        if extensible != "True":
+            # A leaf's projects are always Standard, so is_template, is_standard, and
+            # is_extensible get folded out of its copy; see the script's docstring.
+            scripts = template_only[0] + "scripts{" + "% endif %" + "}"
+            script = template_only[1] + "fold_leaf_gates.py{" + "% endif %" + "}"
+            # Its file name ends in the gate, not .py, so name the loader.
+            loader = importlib.machinery.SourceFileLoader(
+                "fold_leaf_gates", os.path.join(src, "template", scripts, script)
+            )
+            folder = importlib.util.module_from_spec(
+                importlib.util.spec_from_loader(loader.name, loader)
+            )
+            loader.exec_module(folder)
+
+
+        def is_template_only(name):
+            return any(gate in name for gate in template_only)
+
+
+        def skip_template_only(_directory, names):
+            return [n for n in names if is_template_only(n)]
+
+
+        def is_stale(name):
+            # In a leaf: a template-only path, or a name that still carries a
+            # project-type gate (from before the template became a leaf).
+            return is_template_only(name) or folder.fold(name) != name
+
+
+        def local_path(path):
+            # Where a parent template/ path lives in this project's copy.
+            if folder is None:
+                return path
+            return "/".join(folder.fold(part) for part in path.split("/"))
+
+        old = subprocess.run(
+            ["git", "show", "HEAD:" + answers_file.replace("\\", "/")],
+            capture_output=True, text=True,
+        )
+        old_ref = re.search(r"(?m)^_commit:\s*(\S+)", old.stdout) if old.returncode == 0 else None
+        if old_ref:
+            diff = subprocess.run(
+                ["git", "-C", src, "diff", "--name-only", "--no-renames",
+                 "--diff-filter=D", "-z", old_ref.group(1), "HEAD", "--", "template"],
+                capture_output=True, text=True,
+            )
+            if diff.returncode != 0:
+                print("Warning: couldn't diff the parent template from " + old_ref.group(1)
+                      + "; files it deleted since then won't be removed from template/.")
+            for path in map(local_path, filter(None, diff.stdout.split("\0"))):
+                if os.path.isfile(path):
+                    os.remove(path)
+                    parent = os.path.dirname(path)
+                    while parent != "template" and os.path.isdir(parent) and not os.listdir(parent):
+                        os.rmdir(parent)
+                        parent = os.path.dirname(parent)
+        if folder and os.path.isdir("template"):
+            for root, dirs, names in os.walk("template"):
+                for name in [*dirs, *names]:
+                    if is_stale(name):
+                        path = os.path.join(root, name)
+                        shutil.rmtree(path) if os.path.isdir(path) else os.remove(path)
+                dirs[:] = [x for x in dirs if not is_stale(x)]
+        # Fold in a staging copy, so the copy over template/ replaces the folded paths.
+        with tempfile.TemporaryDirectory() as staging:
+            copy = os.path.join(staging, "template")
+            shutil.copytree(
+                os.path.join(src, "template"), copy,
+                ignore=None if folder is None else skip_template_only,
+            )
+            if folder:
+                folder.fold_directory(pathlib.Path(copy))
+            shutil.copytree(copy, "template", dirs_exist_ok=True)
+      - "{{ _copier_conf.src_path }}"
+      - "{{ _copier_conf.answers_file }}"
+      - "{{ is_extensible }}"
+    when: |-
+      {%- if is_template -%}
+        true
+      {%- endif %}
+{%- endraw %}
+{%- endif %}
+{%- raw %}
+
+  # Creates GitHub Repo
+  - command: >-
+      gh repo create
+      {% if github_org and github_org != 'None' %}{{ github_org }}/{% endif %}{{ repo_name }}
+      {% if is_public %}--public{% else %}--private{% endif %}
+    when: |-
+      {%- if _copier_operation == 'copy' and should_create_repo and using_github -%}
+        true
+      {%- endif %}
+
+  # Creates Azure DevOps Repo
+  - command: >-
+      az repos create
+      --name {{ repo_name }}
+      --org https://dev.azure.com/{{ azdo_org }}/
+      --project "{{ azdo_project }}"
+    when: |-
+      {%- if _copier_operation == 'copy' and should_create_repo and using_azdo -%}
+        true
+      {%- endif %}
+
+  # Inits Local Git Repo
+  - command: git init -b main
+    when: &when_copy_create_repo |-
+      {%- if _copier_operation == 'copy' and should_create_repo -%}
+        true
+      {%- endif %}
+
+  # Tracks all Files in Git
+  - command: git add --all
+    when: *when_copy_create_repo
+
+  # Commits template files
+  - command: 'git commit -m "feat: initialize project"'
+    when: *when_copy_create_repo
+
+  # Adds Git Remote
+  - command: >-
+      git remote add origin
+      {% if using_github -%}
+        https://github.com/{{ github_repo_owner }}/{{ repo_name }}.git
+      {%- elif using_azdo -%}
+        https://{{ azdo_org }}@dev.azure.com/{{ azdo_org }}/{{ azdo_project_encoded }}/_git/{{ repo_name }}
+      {%- endif %}
+    when: *when_copy_create_repo
+
+  # Push commit to remote
+  - command: git push -u origin --all
+    when: *when_copy_create_repo
+
+  # Creates Azure Pipeline for maint-auto-monthlymaintenance
+  - command: >-
+      az pipelines create
+      --name "[{{ repo_name }}] Maint (Auto) - Monthly Maintenance"
+      --repository {{ repo_name }}
+      --repository-type tfsgit
+      --branch main
+      --yml-path .azurepipelines/maint-auto-monthlymaintenance.yml
+      --skip-first-run true
+      --org https://dev.azure.com/{{ azdo_org }}/
+      --project "{{ azdo_project }}"
+    when: &when_copy_set_repo_settings_azdo |-
+      {%- if _copier_operation == 'copy' and should_set_repo_settings and using_azdo -%}
+        true
+      {%- endif %}
+
+  # Creates Azure Pipeline for docs-auto-zensical
+  - command: >-
+      az pipelines create
+      --name "[{{ repo_name }}] Docs (Auto) - Zensical Build & Commit"
+      --repository {{ repo_name }}
+      --repository-type tfsgit
+      --branch main
+      --yml-path .azurepipelines/docs-auto-zensicalcommit.yml
+      --skip-first-run true
+      --org https://dev.azure.com/{{ azdo_org }}/
+      --project "{{ azdo_project }}"
+    when: *when_copy_set_repo_settings_azdo
+
+  # Runs the docs pipeline once, so docs-site/ exists before the first docs PR merges.
+  - command: >-
+      az pipelines run
+      --name "[{{ repo_name }}] Docs (Auto) - Zensical Build & Commit"
+      --org https://dev.azure.com/{{ azdo_org }}/
+      --project "{{ azdo_project }}"
+    when: *when_copy_set_repo_settings_azdo
+
+  # Creates Azure Pipeline for test-auto-prvalidation
+  - command: >-
+      az pipelines create
+      --name "[{{ repo_name }}] Test (Auto) - PR Validation"
+      --repository {{ repo_name }}
+      --repository-type tfsgit
+      --branch main
+      --yml-path .azurepipelines/test-auto-prvalidation.yml
+      --skip-first-run true
+      --org https://dev.azure.com/{{ azdo_org }}/
+      --project "{{ azdo_project }}"
+    when: *when_copy_set_repo_settings_azdo
+
+  # Requires the pr_validation build to pass before a PR completes, and lets Project
+  # Administrators override it (matching GitHub's admin bypass_actors entry in
+  # settings.yml.jinja). `az repos policy` has no flag for the override: it's a
+  # branch-level security permission, set through the raw security-namespace API
+  # because `az repos` and `az devops` have no command for it. Microsoft's CLI docs
+  # don't give the namespace ID, permission bit, or token format; they come from
+  # https://github.com/Azure/azure-devops-cli-extension/blob/master/doc/security_tokens.md
+  # and https://devblogs.microsoft.com/devops/git-repo-tokens-for-the-security-service/.
+  - command:
+      - "{{ _copier_python }}"
+      - -c
+      - |
+        import json, shutil, subprocess
+
+        ORG = "https://dev.azure.com/{{ azdo_org }}/"
+        PROJECT = "{{ azdo_project }}"
+        # On Windows, az is an az.cmd batch wrapper, which subprocess without a shell
+        # can't find by bare name (FileNotFoundError: [WinError 2]). which() resolves
+        # its path on any platform without needing shell=True.
+        AZ = shutil.which("az") or "az"
+
+
+        def az(*args, project=True):
+            cmd = [AZ, *args, "--org", ORG]
+            if project:
+                cmd += ["--project", PROJECT]
+            return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout
+
+
+        repo_id = az(
+            "repos", "show", "--repository", "{{ repo_name }}", "--query", "id", "-o", "tsv"
+        ).strip()
+        pipeline_id = az(
+            "pipelines", "show", "--name", "[{{ repo_name }}] Test (Auto) - PR Validation",
+            "--query", "id", "-o", "tsv",
+        ).strip()
+
+        subprocess.run(
+            [
+                AZ, "repos", "policy", "build", "create",
+                "--blocking", "true",
+                "--enabled", "true",
+                "--branch", "main",
+                "--build-definition-id", pipeline_id,
+                "--display-name", "PR Validation",
+                "--manual-queue-only", "false",
+                "--queue-on-source-update-only", "false",
+                "--valid-duration", "0",
+                "--repository-id", repo_id,
+                "--org", ORG,
+                "--project", PROJECT,
+            ],
+            check=True,
+        )
+
+        project_id = az("devops", "project", "show", "--query", "id", "-o", "tsv").strip()
+        groups = json.loads(az("devops", "security", "group", "list", "-o", "json"))
+        descriptor = next(
+            g["descriptor"]
+            for g in groups["graphGroups"]
+            if g["displayName"] == "Project Administrators"
+        )
+        # refs/heads/main, UTF-16LE hex-encoded per character: Azure DevOps's Git ACL
+        # token format for a branch.
+        token = f"repoV2/{project_id}/{repo_id}/refs/heads/6d00610069006e00"
+        subprocess.run(
+            [
+                AZ, "devops", "security", "permission", "update",
+                "--namespace-id", "2e9eb7ed-3c0a-47d4-87c1-0ffdd275fd87",  # Git Repositories
+                "--subject", descriptor,
+                "--token", token,
+                "--allow-bit", "32768",  # PullRequestBypassPolicy
+                "--org", ORG,
+            ],
+            check=True,
+        )
+    when: *when_copy_set_repo_settings_azdo
+
+  # Creates Azure Pipeline for release-auto-release
+  - command: >-
+      az pipelines create
+      --name "[{{ repo_name }}] Release (Auto) - Prepare & Publish Release"
+      --repository {{ repo_name }}
+      --repository-type tfsgit
+      --branch main
+      --yml-path .azurepipelines/release-auto-release.yml
+      --skip-first-run true
+      --org https://dev.azure.com/{{ azdo_org }}/
+      --project "{{ azdo_project }}"
+    when: *when_copy_set_repo_settings_azdo
+
+  # Runs the release pipeline once, so the first release PR opens right away.
+  - command: >-
+      az pipelines run
+      --name "[{{ repo_name }}] Release (Auto) - Prepare & Publish Release"
+      --org https://dev.azure.com/{{ azdo_org }}/
+      --project "{{ azdo_project }}"
+    when: *when_copy_set_repo_settings_azdo
+
+  # Applies .github/settings.yml with gh-settings, which mise.toml pins: the repo
+  # settings, labels, branch protection ruleset, Actions settings, and, with GitHub
+  # Pages, the Pages site and its environment. `mise run sync-repo-settings` reapplies
+  # it after a change. Only the new project's mise.toml provides gh-settings, so this
+  # runs it through `mise x`, which installs it and trusts that mise.toml.
+  - command:
+      - mise
+      - x
+      - --
+      - gh-settings
+      - sync
+      - --yes
+      - --repo
+      - "{{ github_repo_owner }}/{{ repo_name }}"
+    when: |-
+      {%- if _copier_operation == 'copy' and using_github and repo_setup_actions != 'None' -%}
+        true
+      {%- endif %}
+
+  # Reapplies the github-pages environment. gh-settings applies environments before
+  # Pages, and enabling Pages restricts that environment to the default branch, which
+  # would block docs publishing from a release tag. Remove this once gh-settings orders
+  # environments after Pages: https://github.com/postmodern-templates/repo-template/issues/1332
+  - command:
+      - mise
+      - x
+      - --
+      - gh-settings
+      - sync
+      - --yes
+      - --only
+      - environments
+      - --repo
+      - "{{ github_repo_owner }}/{{ repo_name }}"
+    when: |-
+      {%- if _copier_operation == 'copy' and using_github and zensical_ghpages and repo_setup_actions != 'None' -%}
+        true
+      {%- endif %}
+
+  # Enables CodeQL default setup, for public repos only: private repos need a paid
+  # GitHub Advanced Security license. Right after the first push, GitHub can answer
+  # 422 "Failed to toggle code scanning default setup" for a minute or so, then enables
+  # it, so this retries a 422 for up to three minutes; any other error fails at once.
+  - command:
+      - "{{ _copier_python }}"
+      - -c
+      - |
+        import shutil, subprocess, sys, time
+
+        GH = shutil.which("gh") or "gh"
+        ENDPOINT = "repos/{{ github_repo_owner }}/{{ repo_name }}/code-scanning/default-setup"
+        for attempt in range(19):
+            result = subprocess.run(
+                [GH, "api", ENDPOINT, "-X", "PATCH", "-f", "state=configured"],
+                capture_output=True, text=True,
+            )
+            if result.returncode == 0:
+                sys.exit(0)
+            if "HTTP 422" not in result.stderr or attempt == 18:
+                sys.exit(f"Couldn't enable CodeQL default setup: {result.stderr.strip()}")
+            if attempt == 0:
+                print("GitHub isn't ready to enable CodeQL yet; retrying for up to 3 minutes.")
+            time.sleep(10)
+    when: &when_copy_public_github |-
+      {%- if _copier_operation == 'copy' and is_public and using_github and repo_setup_actions != 'None' -%}
+        true
+      {%- endif %}
+
+  # Lets anyone report a vulnerability privately (Security > Advisories) instead of in a
+  # public issue. Public repos only: a private repo's issues are already limited to its
+  # collaborators.
+  - command: gh api repos/{{ github_repo_owner }}/{{ repo_name }}/private-vulnerability-reporting -X PUT
+    when: *when_copy_public_github
+
+  # Opens the setup checklist as a GitHub Issue
+  - command:
+      - gh
+      - issue
+      - create
+      - --repo
+      - "{{ github_repo_owner }}/{{ repo_name }}"
+      - --title
+      - "Template Setup Checklist"
+      - --body
+      - "{{ setup_checklist }}"
+    when: |-
+      {%- if _copier_operation == 'copy' and using_github and repo_setup_actions != 'None' -%}
+        true
+      {%- endif %}
+# endregion Tasks
+
+# region Messages
+_message_after_copy: |-
+  {%- if using_azdo or (using_github and repo_setup_actions == 'None') %}
+
+  Setup checklist:
+  {{ setup_checklist }}
+
+  {% endif -%}
+  {%- if using_github and repo_setup_actions == 'None' -%}
+    Once the repo exists, run `mise run sync-repo-settings` to apply .github/settings.yml (labels, merge options, branch protection, and more), or apply the settings by hand: {{ parent_template_docs_url }}reference/manual-repo-settings{{ parent_template_docs_suffix }}
+
+  {% endif -%}
+  {%- if using_azdo and not should_set_repo_settings -%}
+    Repo setup was skipped, so the pipelines and the PR Validation build policy don't exist yet. Set them up by hand: {{ parent_template_docs_url }}reference/manual-repo-settings{{ parent_template_docs_suffix }}
+
+  {% endif -%}
+  {%- if using_github -%}
+  Before CI works, add these GitHub Actions secrets (Settings > Secrets and variables > Actions):
+    - APPRISE_URL
+  {%- if code_coverage %}
+    - CODECOV_TOKEN
+  {%- endif %}
+  Run `mise run provision-secrets`, or see {{ parent_template_docs_url }}reference/token-permissions{{ parent_template_docs_suffix }} to set them by hand.
+  {%- elif using_azdo -%}
+  Before CI works, set these as secret variables on the pipelines that use them:
+    - APPRISE_URL
+    - GITHUB_COM_TOKEN
+  Run `mise run provision-secrets`, or see {{ parent_template_docs_url }}reference/token-permissions{{ parent_template_docs_suffix }} to set them by hand.
+  {%- endif %}
+
+_message_after_update: |-
+  {%- if lifecycle == 'Stable' and current_knope_version_is_pre_1 -%}
+  This project's lifecycle is 'Stable', but it hasn't released 1.0.0. This update pins the
+  next release to 1.0.0 in .config/knope-release-override.json; once it's merged to main, the
+  release PR proposes 1.0.0.
+  {%- endif %}
+  {%- set changesets = (('"' ~ _copier_python ~ '" -c "import glob, os, sys; print(chr(10).join(glob.glob(os.path.join(sys.argv[1], \'.changeset\', \'template-update-*.md\'))))" "' ~ _copier_conf.dst_path ~ '"') | shell()) -%}
+  {%- if changesets.strip() %}
+
+  The '.changeset' folder has new changesets describing upstream template changes. Some (such as
+  platform-specific fixes or template-internal tooling) may not apply here; delete those before
+  merging.
+  {%- endif %}
+# endregion Messages
+{%- endraw %}

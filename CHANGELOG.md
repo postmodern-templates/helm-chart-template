@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.2.0](https://github.com/natescherer/postmodern-helm-chart-copiertemplate/compare/v0.0.1...v0.2.0) (2024-10-23)
+## 0.2.0 (2024-10-23)
 
 
 ### Features

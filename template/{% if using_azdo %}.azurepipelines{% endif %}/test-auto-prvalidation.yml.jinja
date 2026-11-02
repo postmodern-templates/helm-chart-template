@@ -1,0 +1,97 @@
+name: $(BuildId)-pr_validation
+
+# Azure Repos Git doesn't support YAML `pr:` triggers (only GitHub and Bitbucket Cloud
+# sources do). The "PR Validation" build policy from copier.yml.jinja's repo setup is
+# this pipeline's only trigger, so there's no `pr:` block and no `pr:`-only autoCancel.
+trigger:
+  branches:
+    exclude:
+      - "*"
+
+variables:
+  CI: true
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: pr_validation
+    displayName: PR Validation
+    jobs:
+      - job: pr_validation
+        timeoutInMinutes: 15
+        displayName: PR Validation
+        steps:
+          - bash: |
+              # A build policy trigger has no equivalent of GitHub's cancel-in-progress or
+              # the `pr:` trigger's autoCancel, so quick pushes to one PR can leave several
+              # runs racing. This cancels this pipeline's other unfinished PR runs for the
+              # same source branch, which means this PR: Azure Repos allows one open PR per
+              # source and target branch pair.
+              set -euo pipefail
+              API="$(System.CollectionUri)$(System.TeamProject)/_apis/build"
+              AUTH=(-u "user:$SYSTEM_ACCESSTOKEN")
+
+              THIS_BUILD=$(curl -sf "${AUTH[@]}" "$API/builds/$(Build.BuildId)?api-version=7.1")
+              DEFINITION_ID=$(echo "$THIS_BUILD" | jq -r '.definition.id')
+              SOURCE_BRANCH=$(echo "$THIS_BUILD" | jq -r '.sourceBranch')
+
+              OTHER_BUILDS=$(curl -sf "${AUTH[@]}" \
+                "$API/builds?definitions=${DEFINITION_ID}&reasonFilter=pullRequest&api-version=7.1")
+
+              echo "$OTHER_BUILDS" | jq -r --arg branch "$SOURCE_BRANCH" --arg id "$(Build.BuildId)" '
+                .value[]
+                | select(.sourceBranch == $branch)
+                | select(.status == "inProgress" or .status == "notStarted")
+                | select((.id | tostring) != $id)
+                | .id
+              ' | while read -r STALE_ID; do
+                echo "Cancelling superseded run $STALE_ID for this PR..."
+                curl -sf "${AUTH[@]}" -X PATCH -H "Content-Type: application/json" \
+                  -d '{"status": "cancelling"}' \
+                  "$API/builds/${STALE_ID}?api-version=7.1" > /dev/null
+              done
+            displayName: Cancel Superseded PR Validation Runs
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+          - checkout: self
+            fetchDepth: 0
+          - template: templates/setup-mise.yml
+          - pwsh: |
+              $GetSplat = @{
+                ContentType = "application/json"
+                Headers = @{
+                  Authorization = "Basic $([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("user:$env:SYSTEM_ACCESSTOKEN")))"
+                }
+                Uri = "$(System.CollectionUri)/$(System.TeamProject)/_apis/git/repositories/$(Build.Repository.Name)/pullrequests/$(System.PullRequest.PullRequestId)?api-version=7.0"
+              }
+              $PRTitle = (Invoke-RestMethod @GetSplat).title
+              $PRTitle | mise x -- committed --config .config/committed.toml --commit-file -
+            displayName: Check PR Title is a Conventional Commit
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+          - bash: |
+              # Lints only the files this PR changes, with the same git diff as GitHub, so
+              # the same PR passes or fails on both platforms whatever the rest of the repo
+              # looks like.
+              git fetch origin $(System.PullRequest.TargetBranchName)
+              CHANGED_FILES=$(git diff --name-only "origin/$(System.PullRequest.TargetBranchName)...HEAD")
+              if [ -z "$CHANGED_FILES" ]; then
+                echo "No changed files detected; skipping prek."
+              else
+                echo "$CHANGED_FILES"
+                mapfile -t FILES <<< "$CHANGED_FILES"
+                mise x -- prek run -c .config/prek.toml --files "${FILES[@]}"
+              fi
+            displayName: Run Prek Tests
+{%- if is_template %}
+          - bash: mise x -- pytest tests/
+            displayName: Run Template Render Tests
+{%- endif %}
+{%- if code_coverage %}
+          - task: PublishCodeCoverageResults@2
+            condition: succeededOrFailed()
+            inputs:
+              summaryFileLocation: $(Build.SourcesDirectory)/coverage.xml
+              failIfCoverageEmpty: false
+{%- endif %}

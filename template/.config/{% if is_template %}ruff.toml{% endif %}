@@ -1,0 +1,25 @@
+# Selected Rulesets
+#
+# B     = flake8-bugbear
+# C     = Pylint convention rules
+# D     = pydocstyle
+# DOC   = pydoclint
+# E & W = pycodestyle
+# F     = pyflakes
+# I     = isort
+# N     = pep8-naming
+# UP    = pyupgrade
+# S     = flake8-bandit
+
+[lint]
+preview = true
+select = ["B", "C", "D", "DOC", "E", "F", "I", "N", "S", "UP", "W"]
+ignore = ["D203", "D213"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"

@@ -1,0 +1,2 @@
+[format.rules]
+trailing-comment-space-width = 1 # This defaults to 2 for some reason

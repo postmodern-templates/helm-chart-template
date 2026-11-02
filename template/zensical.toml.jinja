@@ -1,0 +1,231 @@
+[project]
+site_name = "{{ project_name }}"
+site_description = "{{ project_description }}"
+docs_dir = "docs"
+{%- if zensical_ghpages %}
+# mike builds and deploys each version to the gh-pages branch itself, so local
+# build output is throwaway and lives in a gitignored cache dir
+site_dir = ".cache/zensical_serve"
+{%- else %}
+# CI builds into docs-site/ and commits it to the repo for offline browsing
+site_dir = "docs-site"
+{%- endif %}
+{%- if is_template %}
+# Makes the integration test runbooks' checkboxes clickable (scoped to those pages)
+extra_javascript = ["assets/javascripts/runbook-checkboxes.js"]
+{%- endif %}
+# Every page under docs_dir must be listed here; test_content.py enforces it
+nav = [
+  { "Home" = "index.md" },
+{%- if is_template %}
+  { "Getting Started" = [
+    { "Prerequisites" = "getting-started/prerequisites.md" },
+    { "Creating a New Project" = "getting-started/new-project.md" },
+    { "Applying to an Existing Project" = "getting-started/existing-project.md" },
+  ] },
+  { "Maintaining This Template" = [
+{%- if is_extensible %}
+    { "Extending This Template" = "maintaining/extending-the-template.md" },
+{%- endif %}
+    { "Development" = "maintaining/development.md" },
+    { "Updating from the Parent Template" = "maintaining/updating-from-template.md" },
+    { "Upgrading from 0.x" = "maintaining/upgrading-from-0x.md" },
+    { "Releasing" = "maintaining/releasing.md" },
+    { "Integration Testing" = [
+      "maintaining/integration-testing/index.md",
+      { "Runbook: GitHub" = "maintaining/integration-testing/runbook-github.md" },
+      { "Runbook: Azure DevOps" = "maintaining/integration-testing/runbook-azdo.md" },
+    ] },
+    { "Troubleshooting" = "maintaining/troubleshooting.md" },
+  ] },
+  { "Reference" = [
+    { "Template Questions" = "reference/template-questions.md" },
+    { "Features" = "reference/features.md" },
+    { "Stability Policy" = "reference/stability-policy.md" },
+    { "Compatibility" = "reference/compatibility.md" },
+    { "Secrets and Tokens" = "reference/token-permissions.md" },
+    { "Manual Repo Settings" = "reference/manual-repo-settings.md" },
+    { "Azure DevOps Limitations" = "reference/azure-devops.md" },
+  ] },
+{%- else %}
+  { "Getting Started" = [
+    { "Prerequisites" = "getting-started/prerequisites.md" },
+  ] },
+  { "Maintaining This Project" = [
+    { "Development" = "maintaining/development.md" },
+    { "Updating from the Parent Template" = "maintaining/updating-from-template.md" },
+    { "Releasing" = "maintaining/releasing.md" },
+    { "Troubleshooting" = "maintaining/troubleshooting.md" },
+  ] },
+  { "Reference" = [
+    { "Features" = "reference/features.md" },
+    { "Compatibility" = "reference/compatibility.md" },
+    { "Secrets and Tokens" = "reference/token-permissions.md" },
+    { "Manual Repo Settings" = "reference/manual-repo-settings.md" },
+  ] },
+{%- endif %}
+]
+{%- if zensical_ghpages %}
+site_url = "https://{{ github_repo_owner }}.github.io/{{ repo_name }}"
+# Adds a link to the repo in the header
+repo_url = "https://github.com/{{ github_repo_owner }}/{{ repo_name }}"
+
+# Shows a version selector backed by mike's versions.json on gh-pages; alias
+# lists aliases (latest, dev) next to the version they point at
+[project.extra.version]
+provider = "mike"
+alias = true
+{%- endif %}
+
+[project.theme]
+variant = "classic" # Switching to modern blocked until built-in versioning support is added
+# Template overrides (e.g. main.html's outdated-version banner on GitHub)
+custom_dir = ".config/zensical-overrides"
+features = [
+  "content.code.annotate", # (1)-style numbered annotations inside code blocks
+  "content.code.copy",
+  "content.tabs.link", # Selecting a tab switches all tabs with the same label site-wide
+  "navigation.indexes", # A section's index.md becomes the section's own page
+  "navigation.footer", # Previous/next page links
+  "navigation.path", # Breadcrumbs above the page title
+  "navigation.sections", # Renders top-level nav sections as groups, not collapsibles
+  "navigation.top", # Back-to-top button
+  "navigation.tracking", # Updates the URL anchor to the heading in view
+  "search.highlight", # Highlights search terms on the page a result opens
+  "search.share", # Button to copy a link to the current search
+  "search.suggest", # Autocompletes the last search word
+  "toc.follow", # Keeps the active heading scrolled into view in the TOC sidebar
+]
+font.text = "Lato"
+font.code = "Cascadia Mono"
+language = "en"
+
+[project.theme.icon]
+logo = "{% if is_template %}octicons/repo-template-24{% else %}material/library{% endif %}"
+{%- if zensical_ghpages %}
+repo = "fontawesome/brands/github"
+{%- endif %}
+
+# ── Color palette (system → light → dark toggle) ───────────────────────────────
+# Docs: https://zensical.org/docs/setup/colors/#automatic-light-dark-mode
+# The toggle cycles through these in order; each toggle.name describes what
+# clicking does (i.e. the next entry), not the current scheme.
+
+# System Color Scheme
+[[project.theme.palette]]
+media = "(prefers-color-scheme)"
+primary = "deep purple"
+accent = "purple"
+toggle.icon = "lucide/sun-moon"
+toggle.name = "Switch to light mode"
+
+# Light Color Scheme
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "deep purple"
+accent = "purple"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+# Dark Color Scheme
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "deep purple"
+accent = "purple"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to system preference"
+
+# ── Plugins ────────────────────────────────────────────────────────────────────
+
+{%- if zensical_ghpages %}
+[project.plugins.mike]
+canonical_version = "latest" # Canonical URLs point at latest, so search engines index only current docs
+deploy_prefix = "" # Deploys versions at the root of gh-pages
+redirect_template = "" # Empty uses mike's built-in redirect page
+alias_type = "symlink" # Aliases (latest, dev) are symlinks to a version, not copies
+{%- endif %}
+{%- if zensical_repo %}
+
+# Makes the committed docs-site/ browsable from file:// (search included)
+# without a web server. A key, not an empty [project.plugins.offline] table, since
+# tombi formats the comment after an empty table as part of it.
+[project.plugins]
+offline = {}
+{%- endif %}
+
+# ── Extensions ──────────────────────────────────────────────────────────────────
+
+# These are all Markdown/Markdown Extensions extensions officially supported by Zensical as of 2026/04/07
+# (Excluding Arithmatex, which requires external configuration files)
+
+[project.markdown_extensions.abbr]
+
+[project.markdown_extensions.admonition]
+
+[project.markdown_extensions.attr_list]
+
+[project.markdown_extensions.def_list]
+
+[project.markdown_extensions.footnotes]
+
+[project.markdown_extensions.md_in_html]
+
+[project.markdown_extensions.tables]
+
+# Adds a ¶ anchor link next to each heading
+[project.markdown_extensions.toc]
+permalink = true
+
+[project.markdown_extensions.pymdownx.blocks.caption]
+
+# ^^insert^^ and ^superscript^
+[project.markdown_extensions.pymdownx.caret]
+
+# CriticMarkup for marking up suggested edits ({++add++}, {--delete--}, ...)
+[project.markdown_extensions.pymdownx.critic]
+
+# Collapsible admonitions (??? note)
+[project.markdown_extensions.pymdownx.details]
+
+[project.markdown_extensions.pymdownx.inlinehilite]
+
+# Keyboard keys (++ctrl+c++)
+[project.markdown_extensions.pymdownx.keys]
+
+# ==highlight==
+[project.markdown_extensions.pymdownx.mark]
+
+# Converts (c), -->, 1/2, etc. to their symbols
+[project.markdown_extensions.pymdownx.smartsymbols]
+
+# Embeds other files with --8<-- "path"
+[project.markdown_extensions.pymdownx.snippets]
+
+# ~~strikethrough~~ and ~subscript~
+[project.markdown_extensions.pymdownx.tilde]
+
+[project.markdown_extensions.pymdownx.highlight]
+anchor_linenums = true # Makes each line number a linkable anchor
+line_spans = "__span" # Wraps each line in a span, needed for line highlighting
+pygments_lang_class = true # Adds a language CSS class, used by code annotations
+
+# Emoji and icon shortcodes (:smile:, :material-github:) rendered as inline SVG
+[project.markdown_extensions.pymdownx.emoji]
+emoji_index = "zensical.extensions.emoji.twemoji"
+emoji_generator = "zensical.extensions.emoji.to_svg"
+
+# Renders ```mermaid fenced blocks as diagrams
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+
+# alternate_style is the only content tabs style the 'classic' theme supports
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+
+# Themed checkboxes in task lists instead of the browser's default
+[project.markdown_extensions.pymdownx.tasklist]
+custom_checkbox = true

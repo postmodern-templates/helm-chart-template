@@ -1,0 +1,19 @@
+exclude = [
+  ".*%7B.*%7D.*", # Python f-strings
+  'git\+https://.*', # Can be removed once squidfunk/mike is replaced by Zensical's built-in versioning
+  'https://github\.com/\$', # Shell/GH-Actions-expression placeholder in a URL (e.g. a $VAR or a templated repository expression), not a real URL
+  '^http://127\.0\.0\.1:', # The chart's NOTES.txt prints a `kubectl port-forward` URL
+  'https://dev\.azure\.com', # This errors frequently, easier to just ignore
+  'https://img\.shields\.io/github/all-contributors/', # Part of template code
+  # Relative links between template/docs/ sources can't resolve before rendering (targets
+  # carry Jinja-conditional or .jinja names); test_render.py link-checks every rendered combo
+  "^file://.*/template/docs/",
+]
+# Files of patterns, which lychee would otherwise read as links: prek.toml's
+# lychee hook passes regex-escaped URLs such as `https://github\.com/...`
+exclude_path = [
+  ".config/lychee.toml",
+  ".config/prek.toml",
+  ".config/typos.toml",
+  "template/.config/lychee.toml.jinja",
+]

@@ -1,0 +1,13 @@
+{#
+  Zensical theme override, loaded via custom_dir in zensical.toml. Fills the
+  theme's empty "outdated" block, which enables the warning banner shown on
+  any mike-deployed docs version other than the latest.
+#}
+{% extends "base.html" %}
+
+{% block outdated %}
+  You're not viewing the latest version.
+  <a href="{{ '../' ~ base_url }}">
+    <strong>Click here to go to latest.</strong>
+  </a>
+{% endblock %}

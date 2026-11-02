@@ -35,7 +35,7 @@ stages:
             displayName: Install Node
           - task: HelmInstaller@1
             displayName: Install Helm
-            inputs: 
+            inputs:
               helmVersionToInstall: latest
           - pwsh: |
               git config user.email "azuredevops@microsoft.com"

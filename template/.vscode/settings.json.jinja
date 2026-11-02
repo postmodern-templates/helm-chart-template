@@ -1,18 +1,87 @@
 {
-  "editor.defaultFormatter": "trunk.io",
 {%- if is_template %}
+  "[jinja-json]": {
+    "editor.tabSize": 2
+  },
+  "[jinja-md]": {
+    "editor.tabSize": 2
+  },
+  "[jinja-toml]": {
+    "editor.tabSize": 2
+  },
+{%- endif %}
+  "[markdown]": {
+    "editor.tabSize": 2
+  },
+{%- if is_template or using_azdo %}
   "files.associations": {
+    "**/.azurepipelines/*.yml": "azure-pipelines"{% if is_template %},
     "**LICENSE*.jinja": "jinja",
+    "**.gitignore*.jinja": "jinja-properties",
     "**.all-contributorsrc*.jinja": "jinja-json",
     "**.json*.jinja": "jinja-json",
     "**.md*.jinja*": "jinja-md",
     "copier.yml": "jinja-yaml",
     "**.y*ml*.jinja": "jinja-yaml",
+    "**.toml*.jinja": "jinja-toml",
     "**.json[{]% endif %[}]": "json",
     "**.md[{]% endif %[}]": "markdown",
     "**.y*ml[{]% endif %[}]": "yaml",
     "**.py[{]% endif %[}]": "python",
-    "**.toml[{]% endif %[}]": "toml"
-  }
+    "**.toml[{]% endif %[}]": "toml"{% endif %}
+  },
 {%- endif %}
+{%- if is_template %}
+  "maptz.regionfolder": {
+    "[jinja-yaml]": {
+      "foldStart": "# region [NAME]",
+      "foldStartRegex": "#\\s*region\\s*(.*)",
+      "foldEnd": "# endregion",
+      "foldEndRegex": "#\\s*endregion\\b"
+    }
+  },
+{%- endif %}
+  "json.schemaDownload.trustedDomains": {
+    "https://docs.renovatebot.com/renovate-schema.json": true
+  },
+  "markdown.validate.ignoredLinks": [
+    // START Ignore allcontributors links
+    "#audio*",
+    "#a11y*",
+    "#bug*",
+    "#blog*",
+    "#business*",
+    "#code*",
+    "#content*",
+    "#data*",
+    "#doc*",
+    "#design*",
+    "#example*",
+    "#eventOrganizing*",
+    "#financial*",
+    "#fundingFinding*",
+    "#ideas*",
+    "#infra*",
+    "#maintenance*",
+    "#mentoring*",
+    "#platform*",
+    "#plugin*",
+    "#projectManagement*",
+    "#promotion*",
+    "#question*",
+    "#research*",
+    "#review*",
+    "#security*",
+    "#tool*",
+    "#translation*",
+    "#test*",
+    "#tutorial*",
+    "#talk*",
+    "#userTesting*",
+    "#video*",
+    // END Ignore allcontributors links
+  ],
+{%- if is_template %}
+  "ruff.configuration": "${workspaceFolder}/.config/ruff.toml",{% endif %}
+  "typos.config": ".config/typos.toml"
 }

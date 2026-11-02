@@ -1,0 +1,281 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "dependencyDashboard": true,
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "schedule": [
+    "* 18 1 * *"
+  ],
+  "prConcurrentLimit": 0,
+  "prHourlyLimit": 0,
+  "commitBody": "Dependency-Update: {{{replace '^[^:]*: ' '' commitMessage}}}",
+  "prFooter": "Dependency-Update: {{{replace '^[^:]*: ' '' prTitle}}}",
+  "azure-pipelines": {
+    "enabled": true,
+    "managerFilePatterns": [
+      "/(^|/)(?:{%.*%})?\\.azurepipelines(?:{%.*%})?/.+\\.ya?ml(?:{%.*%})?(?:\\.jinja)?$/"
+    ]
+  },
+  "copier": {
+    "description": "Copier template updates are handled by the Monthly Maintenance workflow or pipeline's Copier Update Check job",
+    "enabled": false
+  },
+  "github-actions": {
+    "managerFilePatterns": [
+      "/(^|/)(?:{%.*%})?\\.github(?:{%.*%})?/workflows/.+\\.ya?ml(?:{%.*%})?(?:\\.jinja)?$/"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Group actionlint",
+      "matchPackageNames": [
+        "actionlint",
+        "rhysd/actionlint"
+      ],
+      "groupName": "actionlint"
+    },
+    {
+      "description": "Group apprise",
+      "matchPackageNames": [
+        "apprise",
+        "pipx:apprise"
+      ],
+      "groupName": "apprise"
+    },
+    {
+      "description": "Group cli",
+      "matchPackageNames": [
+        "cli/cli",
+        "aqua:cli/cli"
+      ],
+      "groupName": "cli"
+    },
+    {
+      "description": "Group committed",
+      "matchPackageNames": [
+        "committed",
+        "crate-ci/committed"
+      ],
+      "groupName": "committed"
+    },
+    {
+      "description": "Group copier",
+      "matchPackageNames": [
+        "copier",
+        "pipx:copier"
+      ],
+      "groupName": "copier"
+    },
+    {
+      "description": "Group knope",
+      "matchPackageNames": [
+        "knope-dev/knope"
+      ],
+      "groupName": "knope"
+    },
+    {
+      "description": "Group lychee",
+      "matchPackageNames": [
+        "lychee",
+        "lycheeverse/lychee"
+      ],
+      "groupName": "lychee"
+    },
+    {
+      "description": "Group prek",
+      "matchPackageNames": [
+        "j178/prek",
+        "aqua:j178/prek"
+      ],
+      "groupName": "prek"
+    },
+    {
+      "description": "Group renovate",
+      "matchPackageNames": [
+        "renovate",
+        "npm:renovate"
+      ],
+      "groupName": "renovate"
+    },
+    {
+      "description": "Group ruff",
+      "matchPackageNames": [
+        "ruff",
+        "astral-sh/ruff"
+      ],
+      "groupName": "ruff"
+    },
+    {
+      "description": "Group rumdl",
+      "matchPackageNames": [
+        "rumdl",
+        "rvben/rumdl"
+      ],
+      "groupName": "rumdl"
+    },
+    {
+      "description": "Group ryl",
+      "matchPackageNames": [
+        "owenlamont/ryl",
+        "aqua:owenlamont/ryl"
+      ],
+      "groupName": "ryl"
+    },
+    {
+      "description": "Group shellcheck",
+      "matchPackageNames": [
+        "shellcheck",
+        "koalaman/shellcheck"
+      ],
+      "groupName": "shellcheck"
+    },
+    {
+      "description": "Group tombi",
+      "matchPackageNames": [
+        "tombi-toml/tombi",
+        "aqua:tombi-toml/tombi"
+      ],
+      "groupName": "tombi"
+    },
+    {
+      "description": "Group typos",
+      "matchPackageNames": [
+        "crate-ci/typos",
+        "aqua:crate-ci/typos"
+      ],
+      "groupName": "typos"
+    },
+    {
+      "description": "Group uv",
+      "matchPackageNames": [
+        "uv",
+        "astral-sh/uv"
+      ],
+      "groupName": "uv"
+    },
+    {
+      "description": "Group zensical",
+      "matchPackageNames": [
+        "zensical",
+        "pipx:zensical"
+      ],
+      "groupName": "zensical"
+    },
+    {
+      "description": "Leave git-sourced pipx tools to their custom manager, whose loose versioning can compare fork tags",
+      "matchManagers": ["mise"],
+      "matchDepNames": ["/^pipx:git\\+/"],
+      "enabled": false
+    },
+    {
+      "description": "Use standard major version numbers for Azure Pipelines",
+      "matchDatasources": ["azure-pipelines-tasks"],
+      "extractVersion": "^(?<version>\\d+)"
+    }
+  ],
+  "customManagers": [
+    {
+      "description": "Manager for simple mise tools",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/mise\\..*toml(?:{%.*%})?\\.jinja/"
+      ],
+      "matchStrings": [
+        "{#[-]? renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[^\\s]+?))?(?: extractVersion=(?<extractVersion>[^\\s]+?))?(?: registryUrl=(?<registryUrl>[^\\s]+?))?\\s*-?#}\\s+[A-Za-z0-9_\\-\"':/]+\\s?=\\s?[\"'](?<currentValue>[^\"']*)[\"'].*"
+      ],
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver-coerced{{/if}}"
+    },
+    {
+      "description": "Manager for the knope mise tool pin: knope-dev/knope tags each crate separately (knope/vX.Y.Z), which the generic \"simple mise tools\" manager can't filter; extractVersionTemplate keeps only knope's tags",
+      "customType": "regex",
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "knope-dev/knope",
+      "extractVersionTemplate": "^knope/v(?<version>.*)$",
+      "managerFilePatterns": [
+        "/mise\\..*toml(?:{%.*%})?\\.jinja/"
+      ],
+      "matchStrings": [
+        "\"github:knope-dev/knope\"\\s*=\\s*\"knope/v(?<currentValue>[^\"]*)\""
+      ],
+      "versioningTemplate": "semver"
+    },
+    {
+      "description": "Manager for a Template project's own copier.yml min_copier_version pin",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)(?:{%.*%})?copier\\.yml(?:{%.*%})?(?:\\.jinja)?$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\s*\\n_min_copier_version:\\s*[\"'](?<currentValue>[^\"']*)[\"']"
+      ],
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver-coerced{{/if}}"
+    },
+    {
+      "description": "Manager for pipx tools with options",
+      "customType": "regex",
+      "datasourceTemplate": "pypi",
+      "managerFilePatterns": [
+        "/mise\\..*toml(?:{%.*%})?\\.jinja/"
+      ],
+      "matchStrings": [
+        "\\[tools\\.\"?pipx:(?<depName>[A-Za-z0-9_.-]+)\"?\\]\\sversion = \"(?<currentValue>[^\\s]*)\""
+      ],
+      "versioningTemplate": "pep440"
+    },
+    {
+      "description": "Manager for git-sourced pipx tools, as a mise tool or in another tool's uvx_args; loose versioning, since a fork tag like 2.2.0+zensical-0.1.0 keeps its real version in build metadata, which semver ignores",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/(^|/)(?:{%.*%})?mise(\\.\\w+)*\\.toml(?:{%.*%})?(\\.jinja)?$/"
+      ],
+      "matchStrings": [
+        "\\[tools\\.\"pipx:git\\+https://github\\.com/(?<packageName>[^/]+/[^\"]+)\\.git\"\\]\\s+version = \"(?<currentValue>[^\"]+)\"",
+        "--with git\\+https://github\\.com/(?<packageName>[^/]+/[^@\\s\"]+?)\\.git@(?<currentValue>[^\\s\"]+)"
+      ],
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose"
+    },
+    {
+      "description": "Manager for the mise version pin in Azure Pipelines' install step, plus mise-action's in .jinja workflows (which the github-actions manager can't parse as YAML)",
+      "customType": "regex",
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "jdx/mise",
+      "extractVersionTemplate": "^v(?<version>.*)$",
+      "managerFilePatterns": [
+        "/(^|/)(?:{%.*%})?\\.azurepipelines(?:{%.*%})?/.+\\.ya?ml(?:{%.*%})?(?:\\.jinja)?$/",
+        "/(^|/)(?:{%.*%})?\\.github(?:{%.*%})?/workflows/.+\\.ya?ml(?:{%.*%})?\\.jinja$/"
+      ],
+      "matchStrings": [
+        "MISE_VERSION=v(?<currentValue>[^\\s]+)",
+        "version: (?<currentValue>\\d+\\.\\d+\\.\\d+) # jdx/mise"
+      ],
+      "versioningTemplate": "semver"
+    },
+    {
+      "description": "Manager for pipx tool dependencies",
+      "customType": "regex",
+      "datasourceTemplate": "pypi",
+      "managerFilePatterns": [
+        "/mise\\..*toml(?:\\.jinja)?/"
+      ],
+      "matchStrings": [
+        ".*?(--with\\s(?<depName>.+?)(\\[\\S+])*==(?<currentValue>[^\"\\s{]*))"
+      ],
+      "versioningTemplate": "pep440"
+    },
+    {
+      "description": "Manager for npm-backed mise tools with options: the npm counterpart of \"Manager for pipx tools with options\", whose datasource is fixed to pypi",
+      "customType": "regex",
+      "datasourceTemplate": "npm",
+      "managerFilePatterns": [
+        "/mise\\..*toml(?:\\.jinja)?/"
+      ],
+      "matchStrings": [
+        "\\[tools\\.\"?npm:(?<depName>[A-Za-z0-9_.-]+)\"?\\]\\sversion = \"(?<currentValue>[^\\s]*)\""
+      ],
+      "versioningTemplate": "npm"
+    }
+  ]
+}

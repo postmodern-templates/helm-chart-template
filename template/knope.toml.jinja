@@ -1,0 +1,82 @@
+[package]
+versioned_files = [{ path = ".config/knope-current-version.json", regex = "\"version\": \"(?<version>[^\"]+)\"" }]
+changelog = "CHANGELOG.md"
+# Renovate writes a Dependency-Update footer for each bump (see renovate.json), so
+# chore(deps) commits, which Knope otherwise ignores, release as patches.
+extra_changelog_sections = [{ name = "Dependencies", footers = ["Dependency-Update"] }]
+
+[[workflows]]
+name = "autoupdate-knope-pr"
+
+[[workflows.steps]]
+type = "Command"
+command = "git switch -C knope/release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Command"
+command = "git commit -m \"chore: prepare release $version\""
+
+[[workflows.steps]]
+type = "Command"
+command = "git push --force --set-upstream origin knope/release"
+
+{%- if using_github %}
+
+[[workflows.steps]]
+type = "CreatePullRequest"
+base = "main"
+
+[workflows.steps.title]
+template = "chore: prepare release $version"
+
+[workflows.steps.body]
+template = "This PR was created by Knope. Merging it will create a new release (v$version).\n\n$changelog\n\n- [ ] Integration tests have been run and passed (or N/A)"
+{%- endif %}
+{#- On Azure DevOps, release-auto-release.yml opens or updates the PR itself, since a
+    shell = true Command step would interpolate the changelog into a shell string. #}
+
+[[workflows]]
+name = "release-on-knope-pr-merge"
+
+[[workflows.steps]]
+type = "Release"
+{%- if using_azdo %}
+
+[[workflows.steps]]
+type = "Command"
+command = "git push --tags"
+{%- endif %}
+
+[[workflows]]
+# Used only by copier.yml's changeset migration, in a temporary clone of the template
+# with every tag but the project's old template version removed. PrepareRelease bumps
+# from the most recent reachable tag, so that makes it cover the whole jump across
+# several versions, not just the last one. It runs for real, not --dry-run: the clone
+# is discarded anyway, and reading the files it writes is more reliable than parsing
+# dry-run log output.
+name = "compute-upstream-bump"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows]]
+name = "create-prerelease-via-knope"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Release"
+
+[[workflows.steps]]
+type = "Command"
+command = "git push --tags"
+{%- if using_github %}
+
+[github]
+owner = "{{ github_repo_owner }}"
+repo = "{{ repo_name }}"
+{%- endif %}

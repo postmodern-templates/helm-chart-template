@@ -1,0 +1,154 @@
+# Configuration file for `prek`, a git hook framework written in Rust.
+# See https://prek.j178.dev for more information.
+#:schema https://www.schemastore.org/prek.json
+
+default_install_hook_types = ["pre-commit", "commit-msg"]
+exclude = '(\.copier\-answers\.yml|CHANGELOG\.md|docs-site/.*)'
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "actionlint"
+name = "actionlint"
+description = "Runs actionlint to lint GitHub Actions workflow files"
+language = "system"
+entry = "mise x -- actionlint"
+types = ["yaml"]
+# Also matches template/.../workflows/ to cover workflows inside the template
+files = "(^\\.github/workflows/|^template/.*workflows/)"
+
+[[repos.hooks]]
+id = "committed"
+name = "committed"
+description = "Nitpicking commit history since beabf39"
+language = "system"
+entry = "mise x -- committed"
+args = [
+  "--config",
+  ".config/committed.toml",
+  "--fixup",
+  "--wip",
+  "--commit-file",
+]
+stages = ["commit-msg"]
+
+[[repos.hooks]]
+id = "gh-settings-validate"
+name = "gh-settings validate"
+description = "Validates .github/settings.yml, offline"
+language = "system"
+entry = "mise x -- gh-settings validate"
+files = "^\\.github/settings\\.yml$"
+pass_filenames = false
+
+[[repos.hooks]]
+id = "lychee"
+name = "lychee"
+description = "Checks files for broken links"
+language = "system"
+entry = "mise x -- lychee --no-progress -c .config/lychee.toml --cache"
+# This project's own docs publish only with its first release, and a new page only with
+# the release after it's added, so a commit or PR can't check links to them.
+# The scheduled Repo Health Check doesn't use this hook, and checks them once they exist.
+# `=` keeps lychee from reading the file names prek appends as more patterns.
+args = ['--exclude=^https://postmodern\-templates\.github\.io/helm\-chart\-template(/|$)']
+types = ["text"]
+# renovate.json embeds a regex with a backslash-escaped domain that lychee chokes on
+exclude = "renovate\\.json"
+require_serial = true
+
+[[repos.hooks]]
+id = "ruff-check"
+name = "ruff check"
+description = "Run 'ruff check' for extremely fast Python linting"
+language = "system"
+entry = "mise x -- ruff check --force-exclude"
+args = ["--config", ".config/ruff.toml", "--fix"]
+types_or = ["python", "pyi", "jupyter"]
+require_serial = true
+
+[[repos.hooks]]
+id = "ruff-format"
+name = "ruff format"
+description = "Run 'ruff format' for extremely fast Python formatting"
+language = "system"
+entry = "mise x -- ruff format --force-exclude"
+args = ["--config", ".config/ruff.toml"]
+types_or = ["python", "pyi", "jupyter"]
+require_serial = true
+
+[[repos.hooks]]
+id = "rumdl"
+name = "rumdl"
+language = "system"
+entry = "mise x -- rumdl check --fix"
+types = ["markdown"]
+require_serial = true
+
+[[repos.hooks]]
+id = "ryl"
+name = "ryl"
+description = "Lints and formats YAML files"
+language = "system"
+entry = "mise x -- ryl check --fix"
+types = ["yaml"]
+exclude = "copier-answers.yml"
+require_serial = true
+
+[[repos.hooks]]
+id = "shellcheck"
+name = "shellcheck"
+description = "Lints shell scripts for common bugs"
+language = "system"
+entry = "mise x -- shellcheck"
+types = ["shell"]
+require_serial = true
+
+[[repos.hooks]]
+id = "tombi-format"
+name = "tombi-format"
+language = "system"
+entry = "mise x -- tombi format"
+types = ["toml"]
+require_serial = true
+
+[[repos.hooks]]
+id = "tombi-lint"
+name = "tombi-lint"
+language = "system"
+entry = "mise x -- tombi lint"
+types = ["toml"]
+require_serial = true
+
+[[repos.hooks]]
+id = "typos"
+name = "typos"
+description = "Source code spell checker, binary install"
+language = "system"
+entry = "mise x -- typos"
+args = ["-c", ".config/typos.toml", "--write-changes", "--force-exclude"]
+types = ["text"]
+stages = ["pre-commit", "commit-msg"]
+
+[[repos]]
+repo = "builtin"
+
+[[repos.hooks]]
+id = "check-merge-conflict"
+
+[[repos.hooks]]
+id = "end-of-file-fixer"
+
+[[repos.hooks]]
+id = "fix-byte-order-marker"
+
+[[repos.hooks]]
+id = "mixed-line-ending"
+args = ["--fix=lf"]
+
+[[repos.hooks]]
+id = "trailing-whitespace"
+
+[[repos.hooks]]
+id = "check-case-conflict"
