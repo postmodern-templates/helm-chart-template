@@ -637,8 +637,12 @@ def find_azure_resources(
         "--subscription", subscription,
         "--query", f'[].{{name:name,id:id,repo:tags."{RESOURCE_TAG}"}}',
     )  # fmt: skip
+    # Every app in the tenant, matched by name below. A startswith() --filter would be
+    # narrower, but on Windows az is a batch file, and cmd.exe reads the parentheses in
+    # that unquoted argument as its own syntax. --show-mine can miss them: Entra doesn't
+    # always make the account that created an app its owner.
     apps = az_json(
-        "ad", "app", "list", "--filter", f"startswith(displayName,'{prefix}')",
+        "ad", "app", "list", "--all",
         "--query", "[].{name:displayName,appId:appId}",
     )  # fmt: skip
     return [
