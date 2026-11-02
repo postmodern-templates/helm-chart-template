@@ -6,7 +6,7 @@ author_name: Nate Scherer
 code_coverage: false
 copyright_year: '2024'
 developer_platform: GitHub
-extensible_template: false
+extensible_template: true
 github_org: postmodern-templates
 github_username: natescherer
 license: MIT

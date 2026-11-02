@@ -13,18 +13,22 @@
 
 ## Render-validation test suite
 
-The suite lives in `tests/`. Run it with `mise run test`.
+The suite lives in `template/{% if is_template %}tests{% endif %}/`. Run it with:
+
+```sh
+mise x -- pytest "template/{% if is_template %}tests{% endif %}/"
+```
 
 - `conftest.py`: shared fixtures.
 - `test_render.py`: renders every `ANSWER_MATRIX` entry in `answer_matrix.py` and checks the
-  output, including an update from the last tag.
+  output, including an update from the last tag and a copy from a Template child.
 - `test_content.py`: config and content consistency, such as nav completeness and hook-tool
   availability.
-- `test_validators.py`: checks that `copier.yml`'s `validator:` blocks reject each
+- `test_validators.py`: checks that `copier.yml.jinja`'s `validator:` blocks reject each
   `INVALID_ANSWER_MATRIX` entry.
 - `test_answer_matrix_coverage.py`: audits `answer_matrix.py` against the real question set.
 
-Keep `answer_matrix.py` in step with `copier.yml` in the same change:
+Keep `answer_matrix.py` in step with `copier.yml.jinja` in the same change:
 
 - **New question or new choice value:** use every value in at least one
   `ANSWER_MATRIX` entry, respecting the question's `when:` and any `validator:`.
@@ -39,9 +43,17 @@ Keep `answer_matrix.py` in step with `copier.yml` in the same change:
   `INVALID_ANSWER_MATRIX`, with an `expected_error` substring of its message.
 - **Renamed or removed question or value:** update every entry that uses it.
 
+The suite has a second copy in root `tests/`, which PR Validation runs; descendant templates
+inherit the `template/` copy. Add each new or changed test to both, unless descendants
+shouldn't inherit it; then add it to root `tests/` only. Run each copy before committing: the
+`template/` copy with the command above, and root's with `mise x -- pytest tests/`.
+
 A hook's tool entry in `mise.toml.jinja` and its gate in `prek.toml.jinja` must use the same
 condition. `test_hook_tools_available` checks that every local prek hook's tool is installed
-for each answer combination, and relies on that match.
+for each answer combination, and relies on that match. `actionlint` needs
+`is_template or using_github`, not `using_github` alone: `copy-template-files` copies all of
+`template/`, workflows included, into every Template project, so an Azure DevOps Template
+project still runs actionlint.
 
 ## Setup checklist
 

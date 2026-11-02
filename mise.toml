@@ -89,7 +89,7 @@ run = "uv run scripts/template_docs_server.py"
 usage = '''
 flag "--owner <owner>" help="User or organization for the test repos" default="postmodern-templates"
 '''
-run = "python scripts/integration_test_github.py --source https://github.com/postmodern-templates/helm-chart-template --repo-prefix helm-chart-template --leaf"
+run = "python scripts/integration_test_github.py --source https://github.com/postmodern-templates/helm-chart-template --repo-prefix helm-chart-template"
 
 [tasks.integration-test-verify-update-gh]
 # Run after updating Repo B by hand (see the "Repo B" section of
@@ -132,7 +132,7 @@ usage = '''
 flag "--org <org>" help="Azure DevOps organization" env="INTEGRATION_TEST_AZDO_ORG"
 flag "--project <project>" help="Azure DevOps project" env="INTEGRATION_TEST_AZDO_PROJECT"
 '''
-run = "python scripts/integration_test_azdo.py --source https://github.com/postmodern-templates/helm-chart-template --repo-prefix helm-chart-template --leaf"
+run = "python scripts/integration_test_azdo.py --source https://github.com/postmodern-templates/helm-chart-template --repo-prefix helm-chart-template"
 
 [tasks.integration-test-verify-update-azdo]
 # Run after updating Repo B by hand (see the "Repo B" section of
