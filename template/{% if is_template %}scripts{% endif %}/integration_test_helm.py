@@ -248,6 +248,31 @@ def add_federated_credential(
     )  # fmt: skip
 
 
+def oidc_subject_prefix(repo: str) -> str:
+    """Read the start of the subject in the repo's GitHub Actions OIDC tokens.
+
+    It's `repo:<owner>/<repo>`, or, with GitHub's immutable subjects, the same with
+    each name followed by `@<id>`; the repo's settings say which.
+
+    Returns:
+        The subject up to the part naming the branch or environment.
+
+    Raises:
+        SystemExit: if the repo uses a custom subject template, whose subject this
+            can't predict.
+
+    """
+    settings = json.loads(
+        github.gh_value("api", f"repos/{repo}/actions/oidc/customization/sub")
+    )
+    if not settings.get("use_default", True):
+        raise SystemExit(
+            f"{repo} uses a custom OIDC subject template, so the federated "
+            "credential's subject can't be predicted."
+        )
+    return settings["sub_claim_prefix"]
+
+
 def check_chart_published(
     acr: str, subscription: str, repo_name: str, version: str, failures: list[str]
 ) -> None:
@@ -313,14 +338,6 @@ def run_github(args: argparse.Namespace, scratch: str) -> RepoResult:
         acr, client_id, _ = create_azure_resources(
             repo_name, args.subscription, args.resource_group
         )
-    step("Adding a federated credential for the repo's main branch")
-    # The release workflow dispatches the publish workflow on main, so its token's
-    # subject names that branch. Named after the repo, so cleanup finds it on a
-    # shared app.
-    add_federated_credential(
-        client_id, repo_name, GITHUB_OIDC_ISSUER,
-        f"repo:{repo}:ref:refs/heads/main", scratch,
-    )  # fmt: skip
     step(f"Creating {repo} at HEAD")
     # leaf=True leaves out the Template answers, so this copy is Standard by default.
     github.create(
@@ -335,6 +352,14 @@ def run_github(args: argparse.Namespace, scratch: str) -> RepoResult:
         leaf=True,
         extra_answers=helm_answers(acr, repo_name),
     )
+    step("Adding a federated credential for the repo's main branch")
+    # The release workflow dispatches the publish workflow on main, so its token's
+    # subject names that branch. Named after the repo, so cleanup finds it on a
+    # shared app.
+    add_federated_credential(
+        client_id, repo_name, GITHUB_OIDC_ISSUER,
+        f"{oidc_subject_prefix(repo)}:ref:refs/heads/main", scratch,
+    )  # fmt: skip
     step("Setting test secrets and the Azure sign-in variables")
     github.provision_test_secrets(repo)
     for name, value in (
