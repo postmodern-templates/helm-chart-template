@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.3.0 (2026-11-02)
+
+### Breaking Changes
+
+- Releases publish the chart through Knope's release flow,
+signing in with federated identity and a registry access token.
+acr_login_method is gone: give the Azure DevOps service connection's
+identity AcrPush on the registry. GitHub projects need the setup under
+Prerequisites > Helm Chart Publishing.
+
+#### Update to parent template 0.8.3
+
+Replaces Trunk, release-please, and the Invoke tasks with mise, prek, and Knope, and restructures the workflows and docs. See the [parent's upgrade guide](https://postmodern-templates.github.io/repo-template/latest/maintaining/upgrading-from-0x/).
+
+### Features
+
+- publish charts to ACR from GitHub and Azure DevOps (#68)
+- let the Helm integration test publish to an existing registry (#69)
+
+### Fixes
+
+- pull gh actions bot from all-contributors
+- render as an extensible template
+- match GitHub's OIDC subject in Helm chart publishing setup (#70)
+- list Helm test apps without a filter cmd.exe misparses (#71)
+- delete Helm test registries by name and finish cleanup past failures (#72)
+- delete Helm test Azure resources before their service connection (#73)
+
 ## 0.2.0 (2024-10-23)
 
 
