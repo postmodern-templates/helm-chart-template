@@ -42,6 +42,17 @@ questions have since been renamed, so update once with a command that supplies b
 1. If the answers file is `.copier-answers.yml` at the repo root (before v0.4.0), move it to
    `.config/copier-answers.yml` and commit that on its own.
 
+1. Template projects only: Copier doesn't manage `template/`, so remove the files the parent
+   deleted from it since your version yourself. From your project's root (in Git Bash on
+   Windows), with your answers file's `_commit` as `<old-version>` and the release you're
+   updating to as `<new-version>`:
+
+    ```bash
+    git clone --branch <new-version> https://github.com/postmodern-templates/helm-chart-template ~/template-clone
+    git -C ~/template-clone diff --name-only --no-renames --diff-filter=D <old-version> <new-version> -- template | xargs -I{} git rm -q --ignore-unmatch "{}"
+    git commit -m "chore: remove files the parent template deleted"
+    ```
+
 1. From your project's root, run the update. If your answers file has
    `project_short_description`, add `-d project_description="<same text>"`; if it has
    `license: Provide Own`, add `-d license=None`.
@@ -53,6 +64,13 @@ questions have since been renamed, so update once with a command that supplies b
     `--skip-tasks` keeps your old version's setup tasks from rerunning; they'd try to create
     the repo again from your recorded answers. Copier's migrations still run, so the version
     file and changelog headings are handled the same way as on the other path.
+
+1. Template projects only: copy the parent's current `template/` into yours (in Git Bash on
+   Windows), which the skipped tasks would otherwise have done:
+
+    ```bash
+    cp -r ~/template-clone/template/. template/
+    ```
 
 1. Resolve conflicts and review `.changeset/` as for any update, then work through
    [After either path](#after-either-path).
@@ -124,6 +142,7 @@ These docs moved in 1.0.0. Update any links or bookmarks that point at their 0.8
 | `prerequisites` | [`getting-started/prerequisites`](../getting-started/prerequisites.md) |
 | `applying-to-existing-projects` | [`getting-started/existing-project`](../getting-started/existing-project.md) |
 | `releasing` | [`maintaining/releasing`](releasing.md) |
+| `extending-the-template` | [`maintaining/extending-the-template`](extending-the-template.md) |
 | `integration-testing` | [`maintaining/integration-testing/`](integration-testing/index.md) |
 | `manual-verification-github` | [`maintaining/integration-testing/runbook-github`](integration-testing/runbook-github.md) |
 | `manual-verification-azdo` | [`maintaining/integration-testing/runbook-azdo`](integration-testing/runbook-azdo.md) |

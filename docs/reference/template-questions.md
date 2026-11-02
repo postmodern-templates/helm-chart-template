@@ -53,6 +53,38 @@ first copy.
 - **`azdo_org`** / **`azdo_project`**: the Azure DevOps organization and project the repo is
   created in. The project name can contain spaces.
 
+## `project_type`: Standard / Template
+
+The other foundational decision, with `developer_platform`; see
+[the home page](../index.md#the-big-decision). Fixed after the first copy.
+
+**Standard** generates a project repo, a starting point for whatever the project is for.
+**Template** also generates:
+
+- its own `copier.yml`, so the project can be used as a Copier template, as this repo is;
+- fuller docs about the template's own features, including this page;
+- template-authoring tasks such as `mise run integration-test-gh` and `integration-test-azdo`.
+
+See [Extending This Template](../maintaining/extending-the-template.md) for what comes next:
+whether your template will be extended in turn, and checklists for adding to it.
+
+## `extensible_template`: Yes / No
+
+Asked only for `Template`: whether other Copier templates will be built from this one.
+
+- **No** (the default for a new copy) makes a leaf template. Its projects are always
+  Standard, so its copy of `template/` leaves out the template-only files (the child
+  `copier.yml`, tests, scripts, and template docs) and has the `is_template`,
+  `is_standard`, and `is_extensible` conditions folded out of the files it keeps. Its own
+  `copier.yml` doesn't ask `project_type`. Most templates, such as a company's internal deployment template, are
+  leaf templates.
+- **Yes** makes an extensible template. It keeps the whole `template/`, so its projects
+  can be templates too, as this template's are.
+
+An existing Template project is asked once on its next update, with yes preselected, which
+keeps its current behavior. Answering no then removes the template-only files from its
+`template/`. See [Extending This Template](../maintaining/extending-the-template.md#start-here-will-other-templates-build-on-yours).
+
 ## `project_visibility`: Public / Private
 
 A Public repo is an open-source project: visible to anyone and open to contributions. A Private
