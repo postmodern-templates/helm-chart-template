@@ -1818,30 +1818,61 @@ and that <code>Test (Auto) - PR Validation</code> triggers and passes on a new P
 </ul>
 <h2 id="helm-chart-publishing">Helm Chart Publishing<a class="headerlink" href="#helm-chart-publishing" title="Permanent link">&para;</a></h2>
 <p>A separate run: the repos above are Template projects, which don't publish a chart. It
-creates a Standard repo, plus a Basic container registry and a Microsoft Entra app
-registration with AcrPush on it, and the repo signs in as that app through a workload identity service connection.</p>
+creates a Standard repo whose releases push a chart to an Azure Container Registry, signing
+in through a workload identity service connection. Set up Azure in whichever way your
+account allows:</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Create a Temporary Registry</label><label for="__tabbed_1_2">Use an Existing Registry</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>The run creates a Basic registry, a Microsoft Entra app registration with AcrPush on it,
+in a resource group you name, and a service connection that signs in as the app.</p>
 <ul class="task-list">
 <li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Sign in to the Azure CLI with <code>az login</code>, as an account that can create app
-  registrations and assign roles in the test resource group (such as its Owner).</li>
+  registrations and assign roles in the resource group (such as its Owner).</li>
 <li class="task-list-item">
-<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Set the subscription and resource group for the test registry, once, in this repo's
-  <code>mise.local.toml</code>:</p>
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Set the subscription and resource group, once, in this repo's <code>mise.local.toml</code>:</p>
 <div class="language-toml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">[env]</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">INTEGRATION_TEST_AZURE_SUBSCRIPTION</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;subscription-id&gt;"</span>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">INTEGRATION_TEST_AZURE_RESOURCE_GROUP</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;resource-group&gt;"</span>
 </span></code></pre></div>
 </li>
+</ul>
+</div>
+<div class="tabbed-block">
+<p>The run publishes to a registry that already exists, through a service connection in
+the project with AcrPush on the registry, which any pipeline may use. Each run
+publishes under its own <code>helm/integration-test/&lt;repo&gt;</code> path, which cleanup deletes.</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Sign in to the Azure CLI with <code>az login</code>, as an account that can pull from the
+  registry.</li>
+<li class="task-list-item">
+<p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Set the subscription, registry, and service connection, once, in this repo's
+  <code>mise.local.toml</code>:</p>
+<div class="language-toml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">[env]</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="n">INTEGRATION_TEST_AZURE_SUBSCRIPTION</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;subscription-id&gt;"</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">INTEGRATION_TEST_AZURE_REGISTRY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;registry&gt;"</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">INTEGRATION_TEST_AZDO_SERVICE_CONNECTION</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"&lt;service-connection&gt;"</span>
+</span></code></pre></div>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<p>Then, either way:</p>
+<ul class="task-list">
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Start the run:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nb">cd</span><span class="w"> </span>&lt;template-repo-path&gt;
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>mise<span class="w"> </span>run<span class="w"> </span>integration-test-helm-azdo
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nb">cd</span><span class="w"> </span>&lt;template-repo-path&gt;
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>mise<span class="w"> </span>run<span class="w"> </span>integration-test-helm-azdo
 </span></code></pre></div>
 <p><code>--org</code> and <code>--project</code> work as for the main run.
 - [ ] When it finishes, its summary says "all checks passed": the release pipeline's run on
-  the release commit triggered Helm (Auto) - Publish Release Chart, which pushed the chart, at
-  the release's version, to the registry.
-- [ ] Delete the repo, registry, and app registration, pipelines, and service connection, and confirm when it asks:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>mise<span class="w"> </span>run<span class="w"> </span>integration-test-helm-cleanup-azdo
+  the release commit triggered Helm (Auto) - Publish Release Chart, which pushed the chart,
+  at the release's version, to the registry.
+- [ ] Delete what the run made, and confirm when it asks: the repo and its pipelines, plus
+  the service connection, registry, and app registration it created, or the chart it added
+  to an existing registry.</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>mise<span class="w"> </span>run<span class="w"> </span>integration-test-helm-cleanup-azdo
 </span></code></pre></div>
 </li>
 </ul>
@@ -1849,8 +1880,8 @@ registration with AcrPush on it, and the repo signs in as that app through a wor
 <ul class="task-list">
 <li class="task-list-item">
 <p><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Delete the test repos and their pipelines, and confirm when it asks:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nb">cd</span><span class="w"> </span>&lt;template-repo-path&gt;
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>mise<span class="w"> </span>run<span class="w"> </span>integration-test-cleanup-azdo
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nb">cd</span><span class="w"> </span>&lt;template-repo-path&gt;
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>mise<span class="w"> </span>run<span class="w"> </span>integration-test-cleanup-azdo
 </span></code></pre></div>
 <p>It deletes every integration-test repo and pipeline in the project, and their local clones,
 including any left by a run that stopped partway.</p>
