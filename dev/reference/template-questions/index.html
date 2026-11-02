@@ -451,6 +451,8 @@
       
         
       
+        
+      
     
     
     
@@ -494,6 +496,33 @@
 
             </label>
             <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../maintaining/extending-the-template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Extending This Template
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
               
                 
                   
@@ -630,7 +659,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -651,15 +680,15 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
         
-          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
-            <label class="md-nav__title" for="__nav_3_5">
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3_6">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -931,6 +960,28 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Repo location: <code>github_username</code> / <code>github_org</code> / <code>azdo_org</code> / <code>azdo_project</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#project_type-standard-template" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>project_type</code>: Standard / Template
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extensible_template-yes-no" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>extensible_template</code>: Yes / No
       </span>
     </span>
   </a>
@@ -1244,6 +1295,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#project_type-standard-template" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>project_type</code>: Standard / Template
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extensible_template-yes-no" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        <code>extensible_template</code>: Yes / No
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#project_visibility-public-private" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1444,6 +1517,33 @@ first copy.</p>
 <li><strong><code>azdo_org</code></strong> / <strong><code>azdo_project</code></strong>: the Azure DevOps organization and project the repo is
   created in. The project name can contain spaces.</li>
 </ul>
+<h2 id="project_type-standard-template"><code>project_type</code>: Standard / Template<a class="headerlink" href="#project_type-standard-template" title="Permanent link">&para;</a></h2>
+<p>The other foundational decision, with <code>developer_platform</code>; see
+<a href="../../#the-big-decision">the home page</a>. Fixed after the first copy.</p>
+<p><strong>Standard</strong> generates a project repo, a starting point for whatever the project is for.
+<strong>Template</strong> also generates:</p>
+<ul>
+<li>its own <code>copier.yml</code>, so the project can be used as a Copier template, as this repo is;</li>
+<li>fuller docs about the template's own features, including this page;</li>
+<li>template-authoring tasks such as <code>mise run integration-test-gh</code> and <code>integration-test-azdo</code>.</li>
+</ul>
+<p>See <a href="../../maintaining/extending-the-template/">Extending This Template</a> for what comes next:
+whether your template will be extended in turn, and checklists for adding to it.</p>
+<h2 id="extensible_template-yes-no"><code>extensible_template</code>: Yes / No<a class="headerlink" href="#extensible_template-yes-no" title="Permanent link">&para;</a></h2>
+<p>Asked only for <code>Template</code>: whether other Copier templates will be built from this one.</p>
+<ul>
+<li><strong>No</strong> (the default for a new copy) makes a leaf template. Its projects are always
+  Standard, so its copy of <code>template/</code> leaves out the template-only files (the child
+  <code>copier.yml</code>, tests, scripts, and template docs) and has the <code>is_template</code>,
+  <code>is_standard</code>, and <code>is_extensible</code> conditions folded out of the files it keeps. Its own
+  <code>copier.yml</code> doesn't ask <code>project_type</code>. Most templates, such as a company's internal deployment template, are
+  leaf templates.</li>
+<li><strong>Yes</strong> makes an extensible template. It keeps the whole <code>template/</code>, so its projects
+  can be templates too, as this template's are.</li>
+</ul>
+<p>An existing Template project is asked once on its next update, with yes preselected, which
+keeps its current behavior. Answering no then removes the template-only files from its
+<code>template/</code>. See <a href="../../maintaining/extending-the-template/#start-here-will-other-templates-build-on-yours">Extending This Template</a>.</p>
 <h2 id="project_visibility-public-private"><code>project_visibility</code>: Public / Private<a class="headerlink" href="#project_visibility-public-private" title="Permanent link">&para;</a></h2>
 <p>A Public repo is an open-source project: visible to anyone and open to contributions. A Private
 repo is closed-source and requires authentication to access. Fixed after the first copy.

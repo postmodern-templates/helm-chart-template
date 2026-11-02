@@ -453,6 +453,8 @@
       
         
       
+        
+      
     
     
     
@@ -496,6 +498,33 @@
 
             </label>
             <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../extending-the-template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Extending This Template
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
               
                 
                   
@@ -725,7 +754,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -746,15 +775,15 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
         
-          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
-            <label class="md-nav__title" for="__nav_3_5">
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3_6">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -1255,12 +1284,14 @@
       
         
       
+        
+      
     
     
     
     
       <li class="md-path__item">
-        <a href="../development/" class="md-path__link">
+        <a href="../extending-the-template/" class="md-path__link">
           
   
   <span class="md-ellipsis">
@@ -1324,14 +1355,30 @@ questions have since been renamed, so update once with a command that supplies b
    <code>.config/copier-answers.yml</code> and commit that on its own.</p>
 </li>
 <li>
+<p>Template projects only: Copier doesn't manage <code>template/</code>, so remove the files the parent
+   deleted from it since your version yourself. From your project's root (in Git Bash on
+   Windows), with your answers file's <code>_commit</code> as <code>&lt;old-version&gt;</code> and the release you're
+   updating to as <code>&lt;new-version&gt;</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>git<span class="w"> </span>clone<span class="w"> </span>--branch<span class="w"> </span>&lt;new-version&gt;<span class="w"> </span>https://github.com/postmodern-templates/helm-chart-template<span class="w"> </span>~/template-clone
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>git<span class="w"> </span>-C<span class="w"> </span>~/template-clone<span class="w"> </span>diff<span class="w"> </span>--name-only<span class="w"> </span>--no-renames<span class="w"> </span>--diff-filter<span class="o">=</span>D<span class="w"> </span>&lt;old-version&gt;<span class="w"> </span>&lt;new-version&gt;<span class="w"> </span>--<span class="w"> </span>template<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="w"> </span>-I<span class="o">{}</span><span class="w"> </span>git<span class="w"> </span>rm<span class="w"> </span>-q<span class="w"> </span>--ignore-unmatch<span class="w"> </span><span class="s2">"{}"</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">"chore: remove files the parent template deleted"</span>
+</span></code></pre></div>
+</li>
+<li>
 <p>From your project's root, run the update. If your answers file has
    <code>project_short_description</code>, add <code>-d project_description="&lt;same text&gt;"</code>; if it has
    <code>license: Provide Own</code>, add <code>-d license=None</code>.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>mise<span class="w"> </span>x<span class="w"> </span>uv<span class="w"> </span>--<span class="w"> </span>uvx<span class="w"> </span>--refresh<span class="w"> </span>--from<span class="w"> </span>copier@latest<span class="w"> </span>--with<span class="w"> </span>copier-templates-extensions<span class="w"> </span>--with<span class="w"> </span>copier-template-extensions<span class="w"> </span>--with<span class="w"> </span>jinja2-time<span class="w"> </span>--with<span class="w"> </span>jinja2-shell-extension<span class="w"> </span>--with<span class="w"> </span>githubkit<span class="w"> </span>--with<span class="w"> </span>requests<span class="w"> </span>--with<span class="w"> </span>python-slugify<span class="w"> </span>--with<span class="w"> </span>packaging<span class="w"> </span>copier<span class="w"> </span>update<span class="w"> </span>--trust<span class="w"> </span>--skip-tasks<span class="w"> </span>--skip-answered<span class="w"> </span>--answers-file<span class="w"> </span>.config/copier-answers.yml<span class="w"> </span>--vcs-ref<span class="w"> </span>&lt;new-version&gt;<span class="w"> </span>-d<span class="w"> </span><span class="nv">repo_setup_actions</span><span class="o">=</span>None
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>mise<span class="w"> </span>x<span class="w"> </span>uv<span class="w"> </span>--<span class="w"> </span>uvx<span class="w"> </span>--refresh<span class="w"> </span>--from<span class="w"> </span>copier@latest<span class="w"> </span>--with<span class="w"> </span>copier-templates-extensions<span class="w"> </span>--with<span class="w"> </span>copier-template-extensions<span class="w"> </span>--with<span class="w"> </span>jinja2-time<span class="w"> </span>--with<span class="w"> </span>jinja2-shell-extension<span class="w"> </span>--with<span class="w"> </span>githubkit<span class="w"> </span>--with<span class="w"> </span>requests<span class="w"> </span>--with<span class="w"> </span>python-slugify<span class="w"> </span>--with<span class="w"> </span>packaging<span class="w"> </span>copier<span class="w"> </span>update<span class="w"> </span>--trust<span class="w"> </span>--skip-tasks<span class="w"> </span>--skip-answered<span class="w"> </span>--answers-file<span class="w"> </span>.config/copier-answers.yml<span class="w"> </span>--vcs-ref<span class="w"> </span>&lt;new-version&gt;<span class="w"> </span>-d<span class="w"> </span><span class="nv">repo_setup_actions</span><span class="o">=</span>None
 </span></code></pre></div>
 <p><code>--skip-tasks</code> keeps your old version's setup tasks from rerunning; they'd try to create
 the repo again from your recorded answers. Copier's migrations still run, so the version
 file and changelog headings are handled the same way as on the other path.</p>
+</li>
+<li>
+<p>Template projects only: copy the parent's current <code>template/</code> into yours (in Git Bash on
+   Windows), which the skipped tasks would otherwise have done:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>cp<span class="w"> </span>-r<span class="w"> </span>~/template-clone/template/.<span class="w"> </span>template/
+</span></code></pre></div>
 </li>
 <li>
 <p>Resolve conflicts and review <code>.changeset/</code> as for any update, then work through
@@ -1416,6 +1463,10 @@ file and changelog headings are handled the same way as on the other path.</p>
 <tr>
 <td><code>releasing</code></td>
 <td><a href="../releasing/"><code>maintaining/releasing</code></a></td>
+</tr>
+<tr>
+<td><code>extending-the-template</code></td>
+<td><a href="../extending-the-template/"><code>maintaining/extending-the-template</code></a></td>
 </tr>
 <tr>
 <td><code>integration-testing</code></td>

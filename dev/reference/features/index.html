@@ -451,6 +451,8 @@
       
         
       
+        
+      
     
     
     
@@ -494,6 +496,33 @@
 
             </label>
             <ul class="md-nav__list" data-md-scrollfix>
+              
+                
+                  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../maintaining/extending-the-template/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Extending This Template
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+                
               
                 
                   
@@ -630,7 +659,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -651,15 +680,15 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_3_5" id="__nav_3_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
         
-          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_5_label" aria-expanded="false">
-            <label class="md-nav__title" for="__nav_3_5">
+          <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+            <label class="md-nav__title" for="__nav_3_6">
               <span class="md-nav__icon md-icon"></span>
               
   
@@ -988,6 +1017,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#support-for-childrecursive-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Support for Child/Recursive Templates
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#project-lifecycle" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1074,6 +1114,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Support Files
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#template-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Template Projects
       </span>
     </span>
   </a>
@@ -1328,6 +1379,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#support-for-childrecursive-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Support for Child/Recursive Templates
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#project-lifecycle" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1414,6 +1476,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Support Files
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#template-projects" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Template Projects
       </span>
     </span>
   </a>
@@ -1539,6 +1612,8 @@
 <p>The template can create a new project or apply to an existing repo. See <a href="../../getting-started/existing-project/">Applying to an Existing Project</a>.</p>
 <h3 id="support-for-template-updates">Support for Template Updates<a class="headerlink" href="#support-for-template-updates" title="Permanent link">&para;</a></h3>
 <p><a href="https://github.com/copier-org/copier">Copier</a> keeps projects in sync with their parent template. A scheduled GitHub Actions workflow/Azure DevOps pipeline checks for new template releases, and <code>mise run copier-update</code> applies them. See <a href="../../maintaining/updating-from-template/">Updating from the Parent Template</a>.</p>
+<h3 id="support-for-childrecursive-templates">Support for Child/Recursive Templates<a class="headerlink" href="#support-for-childrecursive-templates" title="Permanent link">&para;</a></h3>
+<p>Build your own template from this one; it can keep receiving this template's updates. See <a href="#template-projects">Template Projects</a> and <a href="../../maintaining/extending-the-template/">Extending This Template</a>.</p>
 <h3 id="project-lifecycle">Project Lifecycle<a class="headerlink" href="#project-lifecycle" title="Permanent link">&para;</a></h3>
 <p>A project's <a href="../template-questions/#lifecycle-pre-alpha-alpha-beta-stable-inactive"><code>lifecycle</code></a> (Pre-Alpha, Alpha, Beta, Stable, or Inactive) drives a managed notice at the top of the README. Lifecycle only moves forward (Pre-Alpha to Alpha to Beta to Stable); Inactive is reachable from any state. Change it with <code>mise run set-lifecycle</code>.</p>
 <h3 id="ai-agent-instructions">AI Agent Instructions<a class="headerlink" href="#ai-agent-instructions" title="Permanent link">&para;</a></h3>
@@ -1581,6 +1656,7 @@
 <li><code>.github/settings.yml</code> validation via <a href="https://github.com/noirbizarre/gh-settings">gh-settings</a> (GitHub only); PR Validation also reminds you to apply a changed file after merging</li>
 <li>Link checking via <a href="https://github.com/lycheeverse/lychee">lychee</a></li>
 <li>Markdown linting via <a href="https://github.com/rvben/rumdl">rumdl</a></li>
+<li>Python linting and formatting via <a href="https://github.com/astral-sh/ruff">Ruff</a> (Template projects only)</li>
 <li>Shell script linting via <a href="https://github.com/koalaman/shellcheck">ShellCheck</a></li>
 <li>Spell checking via <a href="https://github.com/crate-ci/typos">typos</a></li>
 <li>TOML linting and formatting via <a href="https://github.com/tombi-toml/tombi">Tombi</a></li>
@@ -1599,7 +1675,7 @@
 </ul>
 <h2 id="support-files">Support Files<a class="headerlink" href="#support-files" title="Permanent link">&para;</a></h2>
 <ul>
-<li><code>.gitignore</code>, set to ignore macOS <code>.DS_Store</code> files, Windows <code>Thumbs.db</code> files, and tool caches</li>
+<li><code>.gitignore</code>, set to ignore macOS <code>.DS_Store</code> files, Windows <code>Thumbs.db</code> files, and tool caches (plus Python bytecode caches in Template projects)</li>
 <li><code>CHANGELOG.md</code>, maintained by Knope</li>
 <li><code>AGENTS.md</code>, instructions for AI coding agents</li>
 <li><code>CODE_OF_CONDUCT.md</code>, derived from <a href="https://www.contributor-covenant.org/">The Contributor Covenant</a> (public projects only)</li>
@@ -1607,8 +1683,18 @@
 <li>Issue forms for bug reports, feature requests, and questions, plus a chooser link for private vulnerability reports (public projects only)</li>
 <li>A pull request template reminding contributors that PR titles must be Conventional Commits (public projects only)</li>
 <li><code>LICENSE</code>, a copy of the <a href="https://choosealicense.com/licenses/mit/">MIT License</a> (public projects only)</li>
-<li><code>README.md</code>, laid out for a product</li>
+<li><code>README.md</code>, laid out for a product (Standard projects) or a template (Template projects)</li>
 <li><code>SECURITY.md</code>, pointing vulnerability reports to GitHub's private reporting (public projects only)</li>
+</ul>
+<h2 id="template-projects">Template Projects<a class="headerlink" href="#template-projects" title="Permanent link">&para;</a></h2>
+<p>Choosing <code>project_type: Template</code> adds tooling for building and maintaining a template of your own (see <a href="../../maintaining/development/#tasks">Development</a> for the full task list):</p>
+<ul>
+<li>An unrendered copy of the parent template's <code>template/</code> directory, so your template starts from (and can keep receiving) everything above. A leaf template (<code>extensible_template: No</code>) gets it without the template-only files or the project-type conditions in the rest, since its projects are never templates</li>
+<li>A pytest render-validation suite that renders every answer combination in an answer matrix and checks the output (<code>mise run test</code>)</li>
+<li><a href="../../maintaining/integration-testing/">Integration tests</a> that create real throwaway repos on GitHub or Azure DevOps (<code>mise run integration-test-gh</code> / <code>mise run integration-test-azdo</code>)</li>
+<li><code>mise run template-docs-server</code>, a live preview of your template's docs rendered under every answer combination</li>
+<li>Python linting and formatting via Ruff for the template's own scripts and tests</li>
+<li>On every <code>copier update</code>, any parent template change worth releasing is turned into a Knope changeset, so it reaches your own changelog and version bump instead of disappearing into a single update commit</li>
 </ul>
 <h2 id="editor-configuration">Editor Configuration<a class="headerlink" href="#editor-configuration" title="Permanent link">&para;</a></h2>
 <p><a href="https://code.visualstudio.com/">Visual Studio Code</a> settings and extension recommendations are included.</p>
